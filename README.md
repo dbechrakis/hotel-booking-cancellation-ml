@@ -87,17 +87,19 @@ These findings are predictive signals, not causal conclusions. Any operational i
 ```text
 hotel-booking-cancellation-ml/
 │
+├── README.md
+│
 ├── notebooks/
 │   └── Hotel_Booking_Complete.ipynb
 │
 ├── figures/
-│   ├── plot1_cancellation_by_segment.png
-│   ├── plot2_heatmap.png
-│   ├── plot3_boxplot_leadtime.png
-│   ├── plot4_monthly_trends.png
-│   ├── regression_residuals.png
-│   ├── shap_classification.png
-│   └── shap_regression.png
+│   ├── plot1_cancellation_by_segment.jpg
+│   ├── plot2_heatmap.jpg
+│   ├── plot3_boxplot_leadtime.jpg
+│   ├── plot4_monthly_trends.jpg
+│   ├── regression_residuals.jpg
+│   ├── shap_classification.jpg
+│   └── shap_regression.jpg
 │
 ├── docs/
 │   ├── Hotel_Booking_Demand_ML_Strategy_Report.docx
