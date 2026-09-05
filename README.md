@@ -1,129 +1,53 @@
-# Hotel Booking Cancellation Prediction
+# Hotel booking cancellation risk
 
-An end-to-end machine learning case study focused on predicting hotel booking cancellations and identifying the operational factors that drive cancellation risk.
+A historical modelling case study asking whether booking characteristics can identify cancellations in a **later booking period**. Built with Python, scikit-learn and SHAP using the public Hotel Booking Demand dataset.
 
-The project uses the **Hotel Booking Demand dataset (~120K bookings)** and combines exploratory analysis, feature engineering, classification, regression, and SHAP-based explainability to translate booking data into actionable business insights.
+## Current evidence
 
-## Business Problem
+The executed notebook, metrics CSVs and source fingerprint in `outputs/` are the authoritative results of the revised analysis. The earlier random-split scores are superseded; the old office documents and `figures/` are archived project material.
 
-Hotel cancellations create uncertainty in inventory planning, revenue forecasting, and operational capacity.
+![Chronological holdout performance](outputs/classification_metrics.png)
 
-The objective is to answer two related questions:
+[Classification metrics](outputs/classification_metrics.csv) · [Retrospective regression metrics](outputs/regression_metrics.csv) · [Split and source manifest](outputs/validation.json)
 
-1. **Which bookings are most likely to be cancelled?**
-2. **Which booking characteristics are associated with higher cancellation risk and longer booking lead times?**
+| Model | F1 | Precision | Recall | Average precision |
+|---|---:|---:|---:|---:|
+| Prior baseline | 0.0000 | 0.0000 | 0.0000 | 0.3152 |
+| Logistic Regression | 0.5901 | 0.4676 | 0.7996 | 0.6438 |
+| Random Forest | 0.5784 | 0.6017 | 0.5569 | 0.6819 |
 
-The analysis is designed from a revenue-management perspective, with an emphasis on interpretable results and actionable signals rather than model performance alone.
+Logistic Regression has the higher F1 at threshold 0.5; Random Forest has the stronger ranking by average precision and ROC AUC. There is no single best model independent of the operating objective.
 
-## Key Results
+## Validation design
 
-| Task | Model | Key Metric |
-|---|---|---:|
-| Cancellation prediction | Logistic Regression | F1: **0.6357** |
-| Cancellation prediction | Random Forest | F1: **0.6583** |
-| Lead-time prediction | Ridge Regression | R²: **0.3858** |
-| Lead-time prediction | Gradient Boosting | R²: **0.5833** |
+- Retain all 119,390 rows. No booking identifier is supplied, so identical rows are not automatically assumed to be duplicate bookings.
+- Infer booking date as scheduled arrival minus lead time; choose the cutoff at the 80th percentile of booking dates.
+- Reserve bookings on/after the cutoff for testing. Training bookings must have both a scheduled stay end and a resolved outcome before the cutoff, to avoid an outcome-dependent cohort of only early cancellations.
+- Fit imputation, scaling and categorical encoding on training data only.
+- Use an explicit feature list; exclude final reservation status, assigned room, booking changes, waiting-list duration and mutable special-request/parking counts.
+- Compare with a prior-probability baseline and report precision, recall, F1, average precision and ROC AUC. Classification threshold is fixed at 0.5 and is not tuned on test data.
 
-The Random Forest achieved the strongest cancellation-classification performance, while Gradient Boosting substantially improved lead-time prediction compared with the linear baseline.
+The source is a historical snapshot: this design reduces leakage risks but cannot establish that every retained attribute was unchanged since booking. One later holdout does not establish performance across multiple seasons or properties.
 
-## Analysis Workflow
+## Business interpretation
 
-### 1. Exploratory Data Analysis
+Predictive ranking and operating decisions are separate questions. Evaluate the cost of false positives and missed cancellations, select a threshold on a separate validation period, and test interventions before claiming revenue uplift. SHAP describes model behaviour; it does not show that changing a feature will prevent a cancellation.
 
-The analysis examines cancellation patterns across hotel type, market segment, lead time, seasonality, deposit type, and booking characteristics.
+The lead-time regression is a **retrospective booking-profile exercise**, not a validated pre-booking forecast: several predictors are known only once a booking exists. It should not be used to claim that the project can forecast future booking lead times operationally.
 
-A key finding is the strong relationship between **lead time and cancellation behaviour**, with cancelled bookings generally being made substantially further in advance.
+## Reproduce
 
-### 2. Feature Engineering
+Tested with Python 3.12. In a virtual environment:
 
-The modelling pipeline includes:
-
-- Lead time
-- Repeat-guest indicators
-- Deposit type
-- Special-request information
-- Stay-duration features
-- `total_guests`
-- `total_nights`
-- `revenue_proxy`
-- Categorical encoding and numerical preprocessing
-
-Potentially leaking post-booking variables such as `reservation_status` and `reservation_status_date` are excluded from the cancellation model.
-
-### 3. Machine Learning
-
-Two classification approaches are evaluated:
-
-- Logistic Regression — interpretable baseline
-- Random Forest — non-linear ensemble model
-
-A separate regression task predicts booking lead time using:
-
-- Ridge Regression — linear baseline
-- Gradient Boosting — non-linear model
-
-All models are evaluated on held-out test data.
-
-### 4. Explainability
-
-SHAP is used to understand model behaviour and identify the features contributing most strongly to predictions. This moves the analysis beyond model scores towards explanations that revenue teams can act on.
-
-## Key Visualizations
-
-Selected figures are stored under `figures/` and cover cancellation patterns, correlations, lead-time distributions, monthly trends, SHAP explainability, and regression diagnostics.
-
-## Business Insights
-
-- **Longer lead times are associated with higher cancellation risk.**
-- **Market segment and booking characteristics provide meaningful information about cancellation behaviour.**
-- Cancellation risk can therefore support proactive revenue-management workflows.
-- High-risk bookings could potentially be targeted with differentiated cancellation policies, non-refundable incentives, or targeted retention actions.
-- SHAP explanations can help revenue teams understand why an individual booking was flagged.
-
-These findings are predictive signals, not causal conclusions. Any operational intervention should be validated with live experiments before production deployment.
-
-## Repository Structure
-
-```text
-hotel-booking-cancellation-ml/
-│
-├── README.md
-│
-├── notebooks/
-│   └── Hotel_Booking_Complete.ipynb
-│
-├── figures/
-│   ├── plot1_cancellation_by_segment.png
-│   ├── plot2_heatmap.png
-│   ├── plot3_boxplot_leadtime.png
-│   ├── plot4_monthly_trends.png
-│   ├── regression_residuals.png
-│   ├── shap_classification.png
-│   └── shap_regression.png
-│
-└── docs/
-    ├── Hotel_Booking_Demand_ML_Strategy_Report.docx
-    └── Hotel_Booking_ML_Strategy.pptx
+```bash
+pip install -r requirements.txt
+python scripts/download_data.py
 ```
 
-## Reproducibility
+Run every cell in `notebooks/Hotel_Booking_Complete.ipynb` from its folder. Outputs are regenerated under `outputs/`. The download checks the exact source SHA-256; the raw CSV is not committed.
 
-The complete analysis is available in `notebooks/Hotel_Booking_Complete.ipynb`.
+Source: [TidyTuesday Hotel Booking Demand mirror](https://github.com/rfordatascience/tidytuesday/tree/master/data/2020/2020-02-11). Consult the source's documentation and attribution before redistributing the dataset.
 
-The original **Hotel Booking Demand** dataset is not included in this repository. This keeps the repository focused on the modelling workflow and avoids duplicating a large external dataset.
+## Context and authorship
 
-## Limitations
-
-- The dataset represents historical hotel bookings and may not generalize directly to other properties or markets.
-- Model performance depends on the available booking features and historical behaviour.
-- The analysis identifies predictive relationships and should not be interpreted as causal inference.
-- Additional validation on more recent or property-specific data would be required before production deployment.
-
-## Tech Stack
-
-**Python · Pandas · NumPy · Scikit-learn · SHAP · Matplotlib · Seaborn · Jupyter**
-
-## Author
-
-**Dimitris Bechrakis**  
-M.Sc. Data Science — The American College of Greece
+Dimitrios Bechrakis · MSc Data Science, The American College of Greece. This portfolio revision was prepared with AI assistance. It makes the analysis and its assumptions reviewable and does not claim production deployment or realised business impact.
