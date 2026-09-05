@@ -1,5 +1,7 @@
 # Hotel booking cancellation risk
 
+[![Evidence checks](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml)
+
 A historical modelling case study asking whether booking characteristics can identify cancellations in a **later booking period**. Built with Python, scikit-learn and SHAP using the public Hotel Booking Demand dataset.
 
 ## Current evidence
@@ -51,3 +53,7 @@ Source: [TidyTuesday Hotel Booking Demand mirror](https://github.com/rfordatasci
 ## Context and authorship
 
 Dimitrios Bechrakis · MSc Data Science, The American College of Greece. This portfolio revision was prepared with AI assistance. It makes the analysis and its assumptions reviewable and does not claim production deployment or realised business impact.
+
+## Licensing
+
+See [licensing scope](LICENSING.md) for the MIT-licensed verification code and the separately governed project materials.
