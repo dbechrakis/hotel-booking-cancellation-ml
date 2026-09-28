@@ -1,4 +1,4 @@
-name: Evidence checks
+name: Code, tests and evidence
 on:
   push:
     branches: [main]
@@ -19,6 +19,10 @@ jobs:
         run: python -m pip install pandas==2.2.3 numpy==2.3.5 scikit-learn==1.8.0 scipy==1.17.0 joblib==1.5.3
       - name: Install local package
         run: python -m pip install --no-deps -e .
+      - name: Lint application code
+        run: |
+          python -m pip install ruff==0.16.9
+          ruff check app.py app src tests scripts --select E4,E7,E9,F
       - name: Validate committed evidence
         run: python ci/verify_evidence.py
       - name: Run decision-system tests

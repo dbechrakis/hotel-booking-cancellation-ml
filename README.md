@@ -1,10 +1,16 @@
 # Hotel Cancellation Risk Decision System
 
-[![Evidence checks](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml)
+[![Code, tests and evidence](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml)
 
 An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates model probabilities into transparent intervention-policy scenarios.
 
 **Stack:** Python · pandas · scikit-learn · SHAP · Streamlit · joblib
+
+**[Explore the decision app locally](#run-locally)** · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
+
+![Threshold policy trade-offs on the chronological holdout](outputs/classification_metrics.png)
+
+The app scores a booking and simulates contact policies against a saved later-period holdout. This image is recorded model evidence; it is not an application screenshot or a live deployment.
 
 ## Business problem
 
@@ -45,8 +51,6 @@ The analysis uses all 119,390 rows from the public Hotel Booking Demand snapshot
 | Random Forest | 0.5784 | **0.6017** | 0.5569 | **0.6819** | **0.8089** |
 
 There is no universally best model. Random Forest ranks the holdout better, while Logistic Regression has stronger recall and F1 at the fixed 0.50 threshold. The deployed portfolio artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and exactly reproduces the committed chronological-holdout metrics.
-
-![Chronological holdout performance](outputs/classification_metrics.png)
 
 [Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 

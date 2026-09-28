@@ -1,7 +1,5 @@
 import unittest
 
-import pandas as pd
-
 from hotel_cancellation.decision import (
     expected_intervention_value,
     recommendation,
