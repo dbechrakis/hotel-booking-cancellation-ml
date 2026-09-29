@@ -6,11 +6,11 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 **Stack:** Python · pandas · scikit-learn · SHAP · Streamlit · joblib
 
-**[Explore the decision app locally](#run-locally)** · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
+**[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
 
-![Threshold policy trade-offs on the chronological holdout](outputs/classification_metrics.png)
+![Live Hotel app scoring a sample booking and showing model contributions](docs/live-app-scoring.jpg)
 
-The app scores a booking and simulates contact policies against a saved later-period holdout. This image is recorded model evidence; it is not an application screenshot or a live deployment.
+The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions; the displayed economic value is a scenario, not measured intervention uplift.
 
 ## Business problem
 
