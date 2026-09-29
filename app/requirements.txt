@@ -1,0 +1,9 @@
+# Lean deployment environment for app/streamlit_app.py.
+# The root requirements.txt also includes research/notebook dependencies.
+-e .
+pandas==2.2.3
+numpy==2.3.5
+scikit-learn==1.8.0
+scipy==1.17.0
+joblib==1.5.3
+streamlit==1.45.1

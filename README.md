@@ -125,6 +125,13 @@ python -m streamlit run app/streamlit_app.py
 
 The committed model artifact and holdout predictions are enough to run the application.
 
+For Streamlit Community Cloud, select this repository's `main` branch, set the
+entrypoint to `app/streamlit_app.py`, and choose Python 3.12 in advanced settings.
+The app-specific [`app/requirements.txt`](app/requirements.txt) installs only
+the runtime dependencies; the root requirements file remains for reproducing
+the full modelling study. The application uses the committed artifact and
+historical holdout, so deployment does not download or retrain source data.
+
 To reproduce training from the fingerprinted source:
 
 ```bash
