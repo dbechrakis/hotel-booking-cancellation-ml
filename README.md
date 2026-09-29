@@ -8,6 +8,14 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 **[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
 
+## Decision in 60 seconds
+
+| Question | Evidence | Decision supported | Boundary |
+|---|---|---|---|
+| Which bookings merit a limited retention review? | A logistic model achieved **0.590 F1** and **0.800 recall** at a 0.50 cutoff on **23,989 later bookings**. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
+
+[Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
+
 ![Live Hotel app scoring a sample booking and showing model contributions](docs/live-app-scoring.jpg)
 
 The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions; the displayed economic value is a scenario, not measured intervention uplift.
