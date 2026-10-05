@@ -1,5 +1,8 @@
 """Decision rules and threshold economics layered above model probabilities."""
 
+from math import ceil, sqrt
+from statistics import NormalDist
+
 import numpy as np
 import pandas as pd
 
@@ -82,3 +85,33 @@ def threshold_table(
             }
         )
     return pd.DataFrame(rows)
+
+
+def experiment_sample_size(
+    baseline_cancellation_rate: float,
+    relative_reduction: float,
+    alpha: float = 0.05,
+    power: float = 0.80,
+) -> int:
+    """Bookings needed per arm to detect a cancellation-rate reduction in a two-arm test.
+
+    Uses the two-sided two-proportion z-test approximation. The baseline is the
+    cancellation rate among bookings the policy would contact (e.g. holdout precision
+    at the chosen threshold); the reduction is the hypothesised relative uplift.
+    """
+    if not 0 < baseline_cancellation_rate < 1:
+        raise ValueError("Baseline cancellation rate must be between 0 and 1")
+    if not 0 < relative_reduction < 1:
+        raise ValueError("Relative reduction must be between 0 and 1")
+    if not 0 < alpha < 1 or not 0 < power < 1:
+        raise ValueError("Alpha and power must be between 0 and 1")
+    control = baseline_cancellation_rate
+    treated = control * (1 - relative_reduction)
+    pooled = (control + treated) / 2
+    z_alpha = NormalDist().inv_cdf(1 - alpha / 2)
+    z_power = NormalDist().inv_cdf(power)
+    numerator = (
+        z_alpha * sqrt(2 * pooled * (1 - pooled))
+        + z_power * sqrt(control * (1 - control) + treated * (1 - treated))
+    ) ** 2
+    return ceil(numerator / (control - treated) ** 2)

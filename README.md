@@ -16,6 +16,8 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 [Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
 
+[See how the assumed uplift would be measured: A/B design and sample sizes](docs/experiment-design.md).
+
 ![Live Hotel app scoring a sample booking and showing model contributions](docs/live-app-scoring.jpg)
 
 The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions; the displayed economic value is a scenario, not measured intervention uplift.
@@ -108,7 +110,7 @@ hotel-booking-cancellation-ml/
 │   ├── contracts.py                  # Explicit 22-feature contract
 │   ├── data.py                       # Matured chronological split
 │   ├── model.py                      # Training/inference/explanations
-│   └── decision.py                   # Risk bands and economics
+│   └── decision.py                   # Risk bands, economics, experiment sizing
 ├── notebooks/                        # Executed modelling study
 ├── scripts/
 │   ├── download_data.py              # Fingerprinted public source
@@ -132,6 +134,12 @@ python -m streamlit run app/streamlit_app.py
 ```
 
 The committed model artifact and holdout predictions are enough to run the application.
+
+The artifact is a pickled scikit-learn pipeline, so it loads only under the exact
+version that exported it (**scikit-learn 1.8.0**, recorded in
+[`model_metadata.json`](artifacts/model_metadata.json)). Install the pinned
+requirements above; with another version the app stops with an explicit message,
+and you can rebuild the artifact for your environment with the training commands below.
 
 For Streamlit Community Cloud, select this repository's `main` branch, set the
 entrypoint to `app/streamlit_app.py`, and choose Python 3.12 in advanced settings.
@@ -157,7 +165,7 @@ The export script refuses to continue if the source fingerprint or reproduced Lo
 - Probabilities are not claimed to be perfectly calibrated.
 - The threshold simulator reuses one historical holdout for scenario exploration; it is not a second independent validation.
 - Intervention effectiveness, guest response, margin recovery, and contact cost are not observed in the dataset.
-- Before operational use, the system would require repeated temporal backtesting, calibration monitoring, fairness/privacy review, and a controlled intervention experiment.
+- Before operational use, the system would require repeated temporal backtesting, calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
 
 See [VALIDATION.md](VALIDATION.md) and [architecture contracts](docs/architecture.md) for the exact verification boundary.
 

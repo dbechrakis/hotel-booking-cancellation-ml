@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import unittest
 
 import pandas as pd
@@ -6,6 +7,7 @@ import pandas as pd
 from hotel_cancellation.contracts import FEATURES
 from hotel_cancellation.model import (
     cancellation_probability,
+    ModelVersionError,
     load_model_bundle,
     local_contributions,
 )
@@ -17,7 +19,13 @@ ROOT = Path(__file__).resolve().parents[1]
 class ModelArtifactTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.pipeline, cls.metadata = load_model_bundle(ROOT / "artifacts")
+        try:
+            cls.pipeline, cls.metadata = load_model_bundle(ROOT / "artifacts")
+        except ModelVersionError as error:
+            # CI installs the pinned version, so a mismatch there is a real failure.
+            if os.environ.get("CI"):
+                raise
+            raise unittest.SkipTest(str(error)) from error
 
     def example_booking(self) -> pd.DataFrame:
         values = {

@@ -17,6 +17,10 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES
 
 
+class ModelVersionError(ValueError):
+    """Raised when the installed scikit-learn differs from the one that exported the artifact."""
+
+
 def build_pipeline() -> Pipeline:
     """Build the exact compact classification pipeline used for deployment."""
     preprocessor = ColumnTransformer(
@@ -87,10 +91,13 @@ def load_model_bundle(artifact_dir: Path) -> tuple[Pipeline, dict]:
     metadata = json.loads(metadata_path.read_text())
     if metadata.get("features") != FEATURES:
         raise ValueError("Model metadata feature contract does not match the package")
-    if metadata.get("scikit_learn_version") != sklearn.__version__:
-        raise ValueError(
-            "Model artifact requires scikit-learn "
-            f"{metadata.get('scikit_learn_version')}; found {sklearn.__version__}"
+    required = metadata.get("scikit_learn_version")
+    if required != sklearn.__version__:
+        raise ModelVersionError(
+            f"Model artifact requires scikit-learn {required}; found {sklearn.__version__}. "
+            "Install the pinned environment with `python -m pip install -r requirements.txt`, "
+            "or rebuild the artifact for your version with `python scripts/download_data.py` "
+            "followed by `python scripts/train_decision_artifacts.py`."
         )
     pipeline = load_pipeline(model_path, metadata.get("artifact_sha256"))
     return pipeline, metadata
