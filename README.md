@@ -177,4 +177,4 @@ Business Analyst | Commercial Analytics · Data Products · Applied Data Science
 
 ## Licensing
 
-See [LICENSING.md](LICENSING.md) for the MIT-licensed verification code and separately governed project materials.
+The application, package, scripts and tests are MIT-licensed; data-derived artifacts and archived coursework are excluded. See [LICENSING.md](LICENSING.md) for the exact scope.
