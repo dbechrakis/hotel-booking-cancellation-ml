@@ -23,7 +23,8 @@ flowchart TD
 | Model → artifact | Reproduced holdout metrics must match committed results before export |
 | Artifact → app | Artifact hash, feature order, and exact scikit-learn version are verified |
 | Booking → score | Non-negative ADR, at least one guest, and at least one night |
-| Score → action | Risk must exceed policy threshold and assumed expected value must be positive |
+| Score → probability | Isotonic calibrator (hash-verified) maps the risk score to a cancellation probability; it is monotone, so ranking is unchanged |
+| Score → action | Risk score must exceed policy threshold and expected value (from the calibrated probability) must be positive |
 | Request → API | Pydantic schema forbids unknown fields and enforces ranges; unseen categories are reported in the response |
 
 ## Why Logistic Regression is deployed

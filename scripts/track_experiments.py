@@ -185,8 +185,8 @@ def main() -> None:
                 mlflow.log_metrics({f"validation_{k}": v for k, v in validation.items()})
                 mlflow.log_metrics({f"holdout_{k}": v for k, v in holdout.items()})
                 if name in committed.index:
-                    # lbfgs stops at a tolerance, so the logistic refit can differ slightly
-                    # across BLAS builds and thread counts; record the gap instead of hiding it.
+                    # Records any drift from the committed notebook metrics (about 1e-7 now
+                    # that the logistic fit converges to tol=1e-8).
                     mlflow.log_metric(
                         "holdout_ap_delta_vs_committed",
                         holdout["average_precision"] - committed.loc[name, "average_precision"],

@@ -4,11 +4,7 @@ import unittest
 
 import pandas as pd
 
-from hotel_cancellation.model import (
-    ModelVersionError,
-    cancellation_probability,
-    load_model_bundle,
-)
+from hotel_cancellation.model import ModelVersionError, load_model_bundle
 
 try:
     from fastapi.testclient import TestClient
@@ -28,7 +24,8 @@ class ApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         try:
-            cls.pipeline, cls.metadata = load_model_bundle(ROOT / "artifacts")
+            cls.bundle = load_model_bundle(ROOT / "artifacts")
+            cls.metadata = cls.bundle.metadata
         except ModelVersionError as error:
             if os.environ.get("CI"):
                 raise
@@ -51,14 +48,20 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(card["holdout_metrics"], self.metadata["holdout_metrics"])
         self.assertEqual(card["test_rows"], 23989)
         self.assertTrue(card["limitations"])
+        self.assertEqual(card["threshold_scale"], "risk_score")
+        self.assertLess(
+            card["calibration"]["evaluation_calibrated"]["brier"],
+            card["calibration"]["evaluation_uncalibrated"]["brier"],
+        )
 
     def test_api_score_matches_direct_artifact_score(self):
         response = self.client.post("/predict", json={"booking": EXAMPLE})
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        direct = cancellation_probability(self.pipeline, pd.DataFrame([EXAMPLE]))[0]
-        self.assertAlmostEqual(body["cancellation_probability"], float(direct), places=12)
-        self.assertEqual(body["flagged"], direct >= 0.5)
+        scores, probabilities = self.bundle.score(pd.DataFrame([EXAMPLE]))
+        self.assertAlmostEqual(body["risk_score"], float(scores[0]), places=12)
+        self.assertAlmostEqual(body["cancellation_probability"], float(probabilities[0]), places=12)
+        self.assertEqual(body["flagged"], scores[0] >= 0.5)
         self.assertEqual(len(body["contributions"]), 6)
         self.assertIsNone(body["decision"])
         self.assertEqual(body["unseen_categories"], {})
@@ -89,9 +92,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         scores = response.json()["scores"]
         self.assertEqual(len(scores), 2)
-        expected = cancellation_probability(
-            self.pipeline, pd.DataFrame([EXAMPLE, long_lead])
-        )
+        _, expected = self.bundle.score(pd.DataFrame([EXAMPLE, long_lead]))
         for score, probability in zip(scores, expected):
             self.assertAlmostEqual(score["cancellation_probability"], float(probability), places=12)
 

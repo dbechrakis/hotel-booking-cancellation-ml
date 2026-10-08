@@ -22,11 +22,7 @@ from hotel_cancellation.decision import (
     recommendation,
     risk_band,
 )
-from hotel_cancellation.model import (
-    cancellation_probability,
-    load_model_bundle,
-    local_contributions,
-)
+from hotel_cancellation.model import load_model_bundle, local_contributions
 
 
 ARTIFACT_DIR = Path(
@@ -114,7 +110,10 @@ class Economics(BaseModel):
     recoverable_margin: float = Field(ge=0, description="Margin recovered if a cancellation is prevented")
     intervention_cost: float = Field(ge=0, description="Cost of one retention contact")
     intervention_success_rate: float = Field(ge=0, le=1, description="Assumed share of contacted cancellations prevented")
-    policy_threshold: float | None = Field(default=None, ge=0, le=1)
+    policy_threshold: float | None = Field(
+        default=None, ge=0, le=1,
+        description="Review threshold on the risk score; defaults to the documented 0.50",
+    )
 
 
 class ScoreRequest(BaseModel):
@@ -141,9 +140,10 @@ class Decision(BaseModel):
 
 
 class Score(BaseModel):
-    cancellation_probability: float
+    risk_score: float = Field(description="Class-weighted logistic score used for ranking and thresholds")
+    cancellation_probability: float = Field(description="Isotonic-calibrated probability used for risk bands and economics")
     risk_band: str
-    flagged: bool = Field(description="Probability is at or above the model's documented 0.50 threshold")
+    flagged: bool = Field(description="Risk score is at or above the model's documented 0.50 threshold")
     unseen_categories: dict[str, str] = Field(
         default_factory=dict,
         description="Categorical values absent from training; they are encoded as all-zero",
@@ -163,7 +163,7 @@ class ScoreResponse(Score):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pipeline, app.state.metadata = load_model_bundle(ARTIFACT_DIR)
+    app.state.bundle = load_model_bundle(ARTIFACT_DIR)
     yield
 
 
@@ -172,7 +172,8 @@ app = FastAPI(
     version=__version__,
     description=(
         "Scores hotel bookings with the chronologically validated logistic model. "
-        "Probabilities rank historical cancellation risk; economic outputs depend on "
+        "The risk score ranks bookings and drives the review threshold; the isotonic-calibrated "
+        "probability drives risk bands and expected value. Economic outputs depend on "
         "caller-supplied assumptions and are not measured uplift."
     ),
     lifespan=lifespan,
@@ -201,21 +202,22 @@ def unseen_categories(booking: Booking, metadata: dict) -> dict[str, str]:
     }
 
 
-def score_frame(request: Request, bookings: list[Booking]) -> tuple[pd.DataFrame, list[float]]:
+def score_frame(request: Request, bookings: list[Booking]) -> tuple[pd.DataFrame, list[tuple[float, float]]]:
     frame = pd.DataFrame([booking.model_dump() for booking in bookings])[FEATURES]
     try:
-        probabilities = cancellation_probability(request.app.state.pipeline, frame)
+        scores, probabilities = request.app.state.bundle.score(frame)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
-    return frame, [float(p) for p in probabilities]
+    return frame, [(float(s), float(p)) for s, p in zip(scores, probabilities)]
 
 
 def build_score(
-    probability: float,
+    scored: tuple[float, float],
     booking: Booking,
     metadata: dict,
     economics: Economics | None,
 ) -> Score:
+    score, probability = scored
     threshold = float(metadata["threshold"])
     decision = None
     if economics is not None:
@@ -233,12 +235,13 @@ def build_score(
         decision = Decision(
             policy_threshold=policy_threshold,
             assumed_expected_value=value,
-            recommendation=recommendation(probability, policy_threshold, value),
+            recommendation=recommendation(score, policy_threshold, value),
         )
     return Score(
+        risk_score=score,
         cancellation_probability=probability,
         risk_band=risk_band(probability),
-        flagged=probability >= threshold,
+        flagged=score >= threshold,
         unseen_categories=unseen_categories(booking, metadata),
         decision=decision,
     )
@@ -246,13 +249,13 @@ def build_score(
 
 @app.get("/health")
 def health(request: Request) -> dict:
-    return {"status": "ok", "model_version": model_version(request.app.state.metadata)}
+    return {"status": "ok", "model_version": model_version(request.app.state.bundle.metadata)}
 
 
 @app.get("/model")
 def model_card(request: Request) -> dict:
     """Validation evidence and limits for the served artifact."""
-    metadata = request.app.state.metadata
+    metadata = request.app.state.bundle.metadata
     return {
         "model": metadata["model"],
         "model_version": model_version(metadata),
@@ -263,6 +266,8 @@ def model_card(request: Request) -> dict:
         "train_rows": metadata["train_rows"],
         "test_rows": metadata["test_rows"],
         "holdout_metrics": metadata["holdout_metrics"],
+        "threshold_scale": metadata["threshold_scale"],
+        "calibration": metadata["calibration"],
         "features": metadata["features"],
         "category_options": metadata["category_options"],
         "limitations": metadata["limitations"],
@@ -271,11 +276,11 @@ def model_card(request: Request) -> dict:
 
 @app.post("/predict", response_model=ScoreResponse)
 def predict(payload: ScoreRequest, request: Request) -> ScoreResponse:
-    metadata = request.app.state.metadata
-    frame, probabilities = score_frame(request, [payload.booking])
-    score = build_score(probabilities[0], payload.booking, metadata, payload.economics)
+    metadata = request.app.state.bundle.metadata
+    frame, scored = score_frame(request, [payload.booking])
+    score = build_score(scored[0], payload.booking, metadata, payload.economics)
     if payload.explain:
-        contributions = local_contributions(request.app.state.pipeline, frame, limit=6)
+        contributions = local_contributions(request.app.state.bundle.pipeline, frame, limit=6)
         score.contributions = [
             Contribution(**row) for row in contributions.to_dict(orient="records")
         ]
@@ -284,12 +289,12 @@ def predict(payload: ScoreRequest, request: Request) -> ScoreResponse:
 
 @app.post("/predict/batch", response_model=BatchResponse)
 def predict_batch(payload: BatchRequest, request: Request) -> BatchResponse:
-    metadata = request.app.state.metadata
-    _, probabilities = score_frame(request, payload.bookings)
+    metadata = request.app.state.bundle.metadata
+    _, scored = score_frame(request, payload.bookings)
     return BatchResponse(
         model_version=model_version(metadata),
         scores=[
-            build_score(probability, booking, metadata, payload.economics)
-            for probability, booking in zip(probabilities, payload.bookings)
+            build_score(pair, booking, metadata, payload.economics)
+            for pair, booking in zip(scored, payload.bookings)
         ],
     )

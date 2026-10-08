@@ -1,5 +1,6 @@
 """Model construction, prediction, and local contribution utilities."""
 
+from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import json
@@ -10,11 +11,16 @@ import pandas as pd
 import sklearn
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES
+
+
+MODEL_FILE = "cancellation_logistic.joblib"
+CALIBRATOR_FILE = "cancellation_calibrator.joblib"
 
 
 class ModelVersionError(ValueError):
@@ -56,7 +62,10 @@ def build_pipeline() -> Pipeline:
             (
                 "model",
                 LogisticRegression(
-                    max_iter=2000,
+                    # A tight tolerance lets lbfgs converge fully, so refits agree across
+                    # BLAS builds and thread counts instead of stopping at a build-specific point.
+                    max_iter=10000,
+                    tol=1e-8,
                     class_weight="balanced",
                     random_state=42,
                 ),
@@ -74,21 +83,43 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_artifact(path: Path, expected_sha256: str | None, expected_type: type):
+    """Load a fitted artifact after integrity verification."""
+    if expected_sha256 and file_sha256(path) != expected_sha256:
+        raise ValueError(f"Artifact integrity check failed: {path.name}")
+    artifact = joblib.load(path)
+    if not isinstance(artifact, expected_type):
+        raise TypeError(f"{path.name} is not a {expected_type.__name__}")
+    return artifact
+
+
 def load_pipeline(path: Path, expected_sha256: str | None = None) -> Pipeline:
     """Load a fitted pipeline after optional integrity verification."""
-    if expected_sha256 and file_sha256(path) != expected_sha256:
-        raise ValueError("Model artifact integrity check failed")
-    pipeline = joblib.load(path)
-    if not isinstance(pipeline, Pipeline):
-        raise TypeError("Model artifact is not a scikit-learn Pipeline")
-    return pipeline
+    return load_artifact(path, expected_sha256, Pipeline)
 
 
-def load_model_bundle(artifact_dir: Path) -> tuple[Pipeline, dict]:
-    """Load the validated model and its feature/validation metadata."""
-    metadata_path = artifact_dir / "model_metadata.json"
-    model_path = artifact_dir / "cancellation_logistic.joblib"
-    metadata = json.loads(metadata_path.read_text())
+def fit_calibrator(scores: np.ndarray, outcomes: np.ndarray) -> IsotonicRegression:
+    """Monotone map from the class-weighted risk score to an observed cancellation rate."""
+    return IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip").fit(scores, outcomes)
+
+
+@dataclass(frozen=True)
+class ModelBundle:
+    """The ranking pipeline, its isotonic calibrator, and their shared metadata."""
+
+    pipeline: Pipeline
+    calibrator: IsotonicRegression
+    metadata: dict
+
+    def score(self, frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+        """Return (risk scores for ranking and thresholds, calibrated probabilities)."""
+        scores = risk_score(self.pipeline, frame)
+        return scores, self.calibrator.predict(scores)
+
+
+def load_model_bundle(artifact_dir: Path) -> ModelBundle:
+    """Load the validated model, its calibrator and their feature/validation metadata."""
+    metadata = json.loads((artifact_dir / "model_metadata.json").read_text())
     if metadata.get("features") != FEATURES:
         raise ValueError("Model metadata feature contract does not match the package")
     required = metadata.get("scikit_learn_version")
@@ -99,8 +130,11 @@ def load_model_bundle(artifact_dir: Path) -> tuple[Pipeline, dict]:
             "or rebuild the artifact for your version with `python scripts/download_data.py` "
             "followed by `python scripts/train_decision_artifacts.py`."
         )
-    pipeline = load_pipeline(model_path, metadata.get("artifact_sha256"))
-    return pipeline, metadata
+    pipeline = load_pipeline(artifact_dir / MODEL_FILE, metadata.get("artifact_sha256"))
+    calibrator = load_artifact(
+        artifact_dir / CALIBRATOR_FILE, metadata.get("calibrator_sha256"), IsotonicRegression
+    )
+    return ModelBundle(pipeline, calibrator, metadata)
 
 
 def validate_booking(frame: pd.DataFrame) -> None:
@@ -118,8 +152,13 @@ def validate_booking(frame: pd.DataFrame) -> None:
         raise ValueError("At least one stay night is required")
 
 
-def cancellation_probability(pipeline: Pipeline, frame: pd.DataFrame) -> np.ndarray:
-    """Return cancellation probabilities after validating the feature contract."""
+def risk_score(pipeline: Pipeline, frame: pd.DataFrame) -> np.ndarray:
+    """Return the class-weighted logistic risk score after validating the feature contract.
+
+    ``class_weight="balanced"`` inflates these scores above observed cancellation rates.
+    Use them to rank bookings and apply the documented threshold; use the calibrated
+    probability for anything that multiplies a probability by money.
+    """
     validate_booking(frame)
     return pipeline.predict_proba(frame[FEATURES])[:, 1]
 

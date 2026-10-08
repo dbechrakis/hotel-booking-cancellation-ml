@@ -12,11 +12,7 @@ from hotel_cancellation.decision import (
     risk_band,
     threshold_table,
 )
-from hotel_cancellation.model import (
-    cancellation_probability,
-    load_model_bundle,
-    local_contributions,
-)
+from hotel_cancellation.model import load_model_bundle, local_contributions
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @st.cache_resource
 def load_resources():
-    pipeline, metadata = load_model_bundle(ROOT / "artifacts")
+    bundle = load_model_bundle(ROOT / "artifacts")
     holdout = pd.read_csv(ROOT / "outputs" / "holdout_predictions.csv.gz")
-    return pipeline, metadata, holdout
+    return bundle, holdout
 
 
 def categorical_input(metadata: dict, feature: str, label: str) -> str:
@@ -152,7 +148,8 @@ def main() -> None:
         "Economic outputs depend entirely on the assumptions you enter."
     )
 
-    pipeline, metadata, holdout = load_resources()
+    bundle, holdout = load_resources()
+    metadata = bundle.metadata
     scoring_tab, policy_tab, evidence_tab = st.tabs(
         ["Score a booking", "Threshold simulator", "Model evidence"]
     )
@@ -170,22 +167,29 @@ def main() -> None:
         success_rate = c3.slider(
             "Intervention success rate", 0.0, 1.0, 0.25, 0.05
         )
-        policy_threshold = c4.slider("Policy threshold", 0.10, 0.90, 0.50, 0.05)
+        policy_threshold = c4.slider("Policy threshold (risk score)", 0.10, 0.90, 0.50, 0.05)
 
         if st.button("Score booking", type="primary"):
             booking = pd.DataFrame([inputs], columns=FEATURES)
-            probability = float(cancellation_probability(pipeline, booking)[0])
+            scores, probabilities = bundle.score(booking)
+            score, probability = float(scores[0]), float(probabilities[0])
             value = expected_intervention_value(
                 probability, recoverable_margin, intervention_cost, success_rate
             )
-            action = recommendation(probability, policy_threshold, value)
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Cancellation probability", f"{probability:.1%}")
-            m2.metric("Risk band", risk_band(probability))
-            m3.metric("Expected intervention value", f"{value:,.2f}")
+            action = recommendation(score, policy_threshold, value)
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Risk score", f"{score:.2f}")
+            m2.metric("Calibrated cancellation probability", f"{probability:.1%}")
+            m3.metric("Risk band", risk_band(probability))
+            m4.metric("Expected intervention value", f"{value:,.2f}")
             st.info(action)
+            st.caption(
+                "The risk score ranks bookings and is compared with the policy threshold. "
+                "The calibrated probability is what the expected value multiplies, because the "
+                "class-weighted score overstates cancellation rates."
+            )
             st.markdown("#### Largest model contributions")
-            contributions = local_contributions(pipeline, booking)
+            contributions = local_contributions(bundle.pipeline, booking)
             st.dataframe(contributions, use_container_width=True, hide_index=True)
             st.caption(
                 "Contributions explain this logistic score. They are associations, "
@@ -208,12 +212,12 @@ def main() -> None:
             key="policy_success",
         )
         selected_threshold = st.slider(
-            "Decision threshold", 0.10, 0.90, 0.50, 0.05,
+            "Decision threshold (risk score)", 0.10, 0.90, 0.50, 0.05,
             key="simulator_threshold",
         )
         table = threshold_table(
             holdout["is_canceled"],
-            holdout["cancellation_probability"],
+            holdout["risk_score"],
             policy_margin,
             policy_cost,
             policy_success,
@@ -239,6 +243,17 @@ def main() -> None:
         e2.metric("F1 at 0.50", f"{metrics['f1']:.3f}")
         e3.metric("Average precision", f"{metrics['average_precision']:.3f}")
         e4.metric("ROC AUC", f"{metrics['roc_auc']:.3f}")
+        calibration = metadata["calibration"]
+        before, after = calibration["evaluation_uncalibrated"], calibration["evaluation_calibrated"]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Brier score", f"{after['brier']:.3f}", f"{after['brier'] - before['brier']:+.3f}", delta_color="inverse")
+        c2.metric("Calibration error (ECE)", f"{after['ece']:.3f}", f"{after['ece'] - before['ece']:+.3f}", delta_color="inverse")
+        c3.metric("Mean predicted vs observed", f"{after['mean_predicted']:.1%} vs {after['observed_rate']:.1%}")
+        st.caption(
+            f"Isotonic calibration was fitted on bookings before {calibration['calibration_cutoff']} "
+            f"({calibration['calibration_rows']:,}) and evaluated on the {calibration['evaluation_rows']:,} later ones."
+        )
+        st.image(str(ROOT / "outputs" / "calibration_reliability.png"), width=480)
         st.markdown(
             f"Training uses bookings before **{metadata['booking_date_cutoff']}** whose "
             "scheduled stays and outcomes had matured before that cutoff. Later bookings "

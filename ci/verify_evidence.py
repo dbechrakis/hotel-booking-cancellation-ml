@@ -29,10 +29,17 @@ close(rows[0]['average_precision'],v['test_cancellation_rate'])
 metadata=json.loads((ROOT/'artifacts/model_metadata.json').read_text())
 artifact=ROOT/'artifacts/cancellation_logistic.joblib'
 assert hashlib.sha256(artifact.read_bytes()).hexdigest()==metadata['artifact_sha256']
+assert hashlib.sha256((ROOT/'artifacts/cancellation_calibrator.joblib').read_bytes()).hexdigest()==metadata['calibrator_sha256']
+lr=[r for r in rows if r['model']=='Logistic Regression'][0]
+for k,value in metadata['holdout_metrics'].items(): close(lr[k],value)
+cal=metadata['calibration']
+assert cal['calibration_rows']+cal['evaluation_rows']==v['test_rows']
+assert cal['evaluation_calibrated']['brier']<cal['evaluation_uncalibrated']['brier']
 assert metadata['features']==v['features']
 predictions=table('outputs/holdout_predictions.csv.gz')
 assert len(predictions)==v['test_rows']
 assert sum(int(r['is_canceled']) for r in predictions)/len(predictions)==v['test_cancellation_rate']
-assert all(0<=float(r['cancellation_probability'])<=1 for r in predictions)
+assert all(0<=float(r['risk_score'])<=1 and 0<=float(r['cancellation_probability'])<=1 for r in predictions)
+assert sum(r['calibration_role']=='calibration' for r in predictions)==cal['calibration_rows']
 
 print('Committed evidence and syntax checks passed; see VALIDATION.md for rerun scope.')

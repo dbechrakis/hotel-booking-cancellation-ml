@@ -43,7 +43,7 @@ with the run manifest in [`run_manifest.json`](../outputs/experiments/run_manife
 | Model | Validation AP | Holdout AP | Holdout ROC AUC | Holdout F1 @0.50 | Holdout Brier |
 |---|---:|---:|---:|---:|---:|
 | Prior baseline | 0.269 | 0.315 | 0.500 | 0.000 | 0.218 |
-| **Logistic Regression** (deployed) | 0.470 | 0.644 | 0.775 | 0.590 | 0.216 |
+| **Logistic Regression** (deployed) | 0.467 | 0.644 | 0.775 | 0.591 | 0.218 |
 | **Random Forest** (selected on validation) | **0.528** | 0.682 | 0.809 | 0.578 | 0.164 |
 | Hist Gradient Boosting | 0.517 | **0.695** | **0.822** | **0.633** | **0.163** |
 
@@ -54,19 +54,18 @@ with the run manifest in [`run_manifest.json`](../outputs/experiments/run_manife
   0.695 AP for a model picked because it scored 0.695, an optimistic estimate. The
   protocol keeps that choice honest, and the disagreement itself is evidence that the
   ranking between tree models is not stable across periods.
-- **The deployed logistic model is the weakest learned ranker and is poorly calibrated.**
-  Its Brier score (0.216) is barely better than predicting the base rate (0.218),
-  largely because `class_weight="balanced"` inflates probabilities. Its scores rank
-  bookings, but they should not be read as cancellation rates.
+- **The deployed logistic model is the weakest learned ranker, and its raw score is not a
+  probability.** Its Brier score (0.218) equals predicting the base rate, because
+  `class_weight="balanced"` inflates scores. The deployed system therefore pairs the score
+  with an isotonic calibrator; see [calibration](calibration.md).
 - **Why it is still deployed:** compact artifact, exact signed contributions, and the
-  documented recall-oriented 0.50 threshold. Replacing it is a product decision that
-  should come with a calibration step (for example isotonic calibration fitted on the
-  inner validation window) and a second temporal backtest.
+  documented recall-oriented 0.50 threshold. Replacing it with a tree model is a product
+  decision that would need its own calibration and a second temporal backtest.
 
-## Reproducibility note
+## Reproducibility
 
-lbfgs stops at a tolerance, so a logistic refit is not bit-identical across BLAS builds
-and thread counts. Refitted here, it differs from the committed artifact by up to 0.007
-in individual probabilities and by +0.00005 in holdout AP. The run logs this gap as
-`holdout_ap_delta_vs_committed`. The API and the Streamlit app always serve the committed,
-hash-verified artifact, not a refit.
+The logistic fit uses `tol=1e-8`, so lbfgs converges fully (about 1,100 iterations)
+instead of stopping at a point that depends on the BLAS build and thread count. Refits on
+Python 3.12 and 3.13, single- and multi-threaded, agree to about 1e-5 in individual
+probabilities and 1e-7 in holdout metrics, and every candidate reproduces the committed
+metrics (`holdout_ap_delta_vs_committed` = 0).

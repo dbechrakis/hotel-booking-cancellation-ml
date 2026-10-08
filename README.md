@@ -2,17 +2,17 @@
 
 [![Code, tests and evidence](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml/badge.svg)](https://github.com/dbechrakis/hotel-booking-cancellation-ml/actions/workflows/evidence.yml)
 
-An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates model probabilities into transparent intervention-policy scenarios.
+An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates calibrated probabilities into transparent intervention-policy scenarios.
 
 **Stack:** Python · pandas · scikit-learn · SHAP · FastAPI · MLflow · Docker · Streamlit
 
-**[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Scoring API](#scoring-api) · [Experiment tracking](docs/experiment-tracking.md) · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
+**[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Scoring API](#scoring-api) · [Experiment tracking](docs/experiment-tracking.md) · [Calibration](docs/calibration.md) · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
 
 ## Decision in 60 seconds
 
 | Question | Evidence | Decision supported | Boundary |
 |---|---|---|---|
-| Which bookings merit a limited retention review? | A logistic model achieved **0.590 F1** and **0.800 recall** at a 0.50 cutoff on **23,989 later bookings**. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
+| Which bookings merit a limited retention review? | A logistic model achieved **0.591 F1** and **0.812 recall** at a 0.50 risk-score cutoff on **23,989 later bookings**. Isotonic calibration cut the probability calibration error from **0.221 to 0.013** on later bookings. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
 
 [Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
 
@@ -57,7 +57,7 @@ The analysis uses all 119,390 rows from the public Hotel Booking Demand snapshot
 | Model | F1 | Precision | Recall | Average precision | ROC AUC |
 |---|---:|---:|---:|---:|---:|
 | Prior baseline | 0.0000 | 0.0000 | 0.0000 | 0.3152 | 0.5000 |
-| **Logistic Regression** | **0.5901** | 0.4676 | **0.7996** | 0.6438 | 0.7748 |
+| **Logistic Regression** | **0.5905** | 0.4641 | **0.8115** | 0.6444 | 0.7750 |
 | Random Forest | 0.5784 | **0.6017** | 0.5569 | **0.6819** | **0.8089** |
 
 There is no universally best model. Random Forest ranks the holdout better, while Logistic Regression has stronger recall and F1 at the fixed 0.50 threshold. The deployed portfolio artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and exactly reproduces the committed chronological-holdout metrics.
@@ -68,13 +68,24 @@ There is no universally best model. Random Forest ranks the holdout better, whil
 
 | Model | Validation AP (selects) | Holdout AP | Holdout Brier |
 |---|---:|---:|---:|
-| Logistic Regression (deployed) | 0.470 | 0.644 | 0.216 |
+| Logistic Regression (deployed, raw score) | 0.467 | 0.644 | 0.218 |
 | Random Forest (selected) | **0.528** | 0.682 | 0.164 |
 | Hist Gradient Boosting | 0.517 | **0.695** | **0.163** |
 
-Validation and holdout disagree on the best tree model, so the holdout winner is not presented as the selected model. The deployed logistic scores rank well enough for a review queue but are poorly calibrated (Brier score close to the base-rate 0.218). [Protocol and full results](docs/experiment-tracking.md).
+Validation and holdout disagree on the best tree model, so the holdout winner is not presented as the selected model. The raw logistic score ranks well enough for a review queue, but it is not a probability: its Brier score equals the base-rate 0.218. [Protocol and full results](docs/experiment-tracking.md).
 
-[Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
+### Calibrated probabilities
+
+The class-weighted score averages 51% on later bookings while 29% cancel. Expected intervention value multiplies a probability by money, so it needs calibration. The system serves the raw **risk score** for ranking and the 0.50 threshold, and an **isotonic-calibrated probability** for risk bands and economics. The calibrator was fitted on the earliest 30% of later bookings and evaluated on the other 16,835:
+
+| | Brier | ECE | Mean predicted vs observed |
+|---|---:|---:|---:|
+| Raw risk score | 0.229 | 0.221 | 51.2% vs 29.2% |
+| **Isotonic probability** | **0.174** | **0.013** | **30.1% vs 29.2%** |
+
+A calibrator fitted inside the training period did not transfer, because `arrival_date_year` is numeric and scores extrapolate by year. [Protocol, reliability diagram and the failed attempt](docs/calibration.md).
+
+[Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout scores and probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 
 ## Validation design
 
@@ -95,9 +106,11 @@ For one booking, the application calculates:
 
 ```text
 Expected intervention value
-= cancellation probability × assumed intervention success × recoverable margin
+= calibrated cancellation probability × assumed intervention success × recoverable margin
 − intervention cost
 ```
+
+A booking is prioritized when its **risk score** clears the policy threshold and this expected value is positive.
 
 For the holdout policy simulator:
 
@@ -116,12 +129,14 @@ hotel-booking-cancellation-ml/
 ├── app/
 │   └── streamlit_app.py              # Risk + policy application
 ├── artifacts/
-│   ├── cancellation_logistic.joblib  # Compact validated pipeline
+│   ├── cancellation_logistic.joblib  # Compact validated pipeline (risk score)
+│   ├── cancellation_calibrator.joblib # Isotonic calibrator (probability)
 │   └── model_metadata.json           # Contract, metrics, defaults, hashes
 ├── src/hotel_cancellation/
 │   ├── contracts.py                  # Explicit 22-feature contract
 │   ├── data.py                       # Matured chronological split
 │   ├── model.py                      # Training/inference/explanations
+│   ├── calibration.py                # Reliability, ECE, Brier diagnostics
 │   ├── decision.py                   # Risk bands, economics, experiment sizing
 │   └── api.py                        # FastAPI scoring service
 ├── notebooks/                        # Executed modelling study
@@ -173,7 +188,7 @@ python scripts/train_decision_artifacts.py
 python -m unittest discover -s tests -v
 ```
 
-The export script refuses to continue if the source fingerprint or reproduced Logistic Regression metrics differ from the committed evidence.
+The export script refuses to continue if the source fingerprint does not match or the reproduced Logistic Regression metrics differ from the committed notebook evidence by more than 1e-6. The logistic fit converges to `tol=1e-8`, so refits agree across BLAS builds and thread counts.
 
 ## Scoring API
 
@@ -191,7 +206,7 @@ Without Docker: `python -m pip install -r requirements.txt -r requirements-dev.t
 |---|---|
 | `GET /health` | Liveness plus the served artifact version (first 12 characters of its SHA-256) |
 | `GET /model` | Model card: holdout metrics, split, feature contract, category options, limitations |
-| `POST /predict` | One booking → probability, risk band, flag at 0.50, top signed contributions; optional economics → expected value and recommendation |
+| `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at 0.50, top signed contributions; optional economics → expected value and recommendation |
 | `POST /predict/batch` | Up to 1,000 bookings per request |
 
 ```bash
@@ -207,6 +222,7 @@ Contract enforcement:
 - Ranges, months, guests and stay nights are validated before scoring.
 - A categorical value never seen in training is scored, because the encoder ignores it. The response lists it in `unseen_categories` so the caller knows the score used less information.
 - Every response carries `model_version` and an `X-Process-Time-Ms` header.
+- The threshold and `policy_threshold` apply to `risk_score`; risk bands and expected value use the calibrated `cancellation_probability`.
 
 CI builds the image, starts the container and checks a real prediction on every push. This is a portfolio service: it has no authentication, rate limiting, request logging or drift monitoring.
 
@@ -214,7 +230,7 @@ CI builds the image, starts the container and checks a real prediction on every 
 
 - Logistic contributions explain the score mechanically; they are not causal effects.
 - The risk score is a ranking tool, not a guarantee for an individual booking.
-- Probabilities are not claimed to be perfectly calibrated.
+- The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones; a shift in the cancellation base rate would require recalibration.
 - The threshold simulator reuses one historical holdout for scenario exploration; it is not a second independent validation.
 - Intervention effectiveness, guest response, margin recovery, and contact cost are not observed in the dataset.
 - Before operational use, the system would require repeated temporal backtesting, calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
