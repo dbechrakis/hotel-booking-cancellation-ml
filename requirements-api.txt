@@ -1,0 +1,8 @@
+# Lean serving environment for the FastAPI scoring service (src/hotel_cancellation/api.py).
+pandas==2.2.3
+numpy==2.3.5
+scikit-learn==1.8.0
+scipy==1.17.0
+joblib==1.5.3
+fastapi==0.143.0
+uvicorn==0.54.0

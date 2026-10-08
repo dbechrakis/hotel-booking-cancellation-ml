@@ -24,6 +24,7 @@ flowchart TD
 | Artifact → app | Artifact hash, feature order, and exact scikit-learn version are verified |
 | Booking → score | Non-negative ADR, at least one guest, and at least one night |
 | Score → action | Risk must exceed policy threshold and assumed expected value must be positive |
+| Request → API | Pydantic schema forbids unknown fields and enforces ranges; unseen categories are reported in the response |
 
 ## Why Logistic Regression is deployed
 
@@ -48,4 +49,4 @@ The Random Forest has stronger average precision and ROC AUC on the later-period
 
 ## Operating boundary
 
-The Streamlit app is a portfolio demonstration over historical evidence. A real retention workflow would need a current feature feed, periodic calibration and drift checks, privacy controls, and a randomized test of whether contacts change outcomes. At materially higher traffic, model loading stays cached per process, while scoring could move to a service; the historical simulator should remain separate from a live decision log.
+The Streamlit app is a portfolio demonstration over historical evidence. A real retention workflow would need a current feature feed, periodic calibration and drift checks, privacy controls, and a randomized test of whether contacts change outcomes. Scoring is also exposed as a stateless FastAPI service (`src/hotel_cancellation/api.py`), packaged in Docker, that loads the artifact once per worker; the historical simulator should remain separate from a live decision log.

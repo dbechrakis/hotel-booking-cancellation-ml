@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install decision-system dependencies
-        run: python -m pip install pandas==2.2.3 numpy==2.3.5 scikit-learn==1.8.0 scipy==1.17.0 joblib==1.5.3
+        run: python -m pip install pandas==2.2.3 numpy==2.3.5 scikit-learn==1.8.0 scipy==1.17.0 joblib==1.5.3 fastapi==0.143.0 uvicorn==0.54.0 httpx2==2.13.1
       - name: Install local package
         run: python -m pip install --no-deps -e .
       - name: Lint application code
@@ -27,3 +27,21 @@ jobs:
         run: python ci/verify_evidence.py
       - name: Run decision-system tests
         run: python -m unittest discover -s tests -v
+  api-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build serving image
+        run: docker build -t hotel-cancellation-api .
+      - name: Smoke-test the running container
+        run: |
+          docker run -d --name api -p 8000:8000 hotel-cancellation-api
+          for i in $(seq 1 30); do curl -sf localhost:8000/health && break; sleep 1; done
+          curl -sf localhost:8000/health
+          curl -sf -X POST localhost:8000/predict -H 'content-type: application/json' \
+            -d "$(python3 -c 'import json; print(json.dumps({"booking": json.load(open("docs/api-example-booking.json"))}))')" \
+            | python3 -c 'import json,sys; r=json.load(sys.stdin); assert 0 <= r["cancellation_probability"] <= 1; print(r)'
+      - name: Container logs
+        if: always()
+        run: docker logs api || true
