@@ -54,3 +54,13 @@ The app is a portfolio decision-support demonstration. No intervention success o
 - The isotonic calibrator was refitted on the same window. On evaluation bookings, Brier fell 0.182 → 0.174 and ECE 0.073 → 0.013.
 - The API and the app no longer take an arrival year. Their flag and the app's default thresholds use the policy threshold.
 - With pinned dependencies on Python 3.12: 22 tests pass, Ruff passes and the evidence check passes. A Streamlit AppTest scored the default booking without exceptions (risk score 0.78, calibrated probability 55.8%).
+
+## Score monitoring — 2026-10-08
+
+- The API now logs one JSON line per scored booking (no booking attributes) and serves `GET /monitoring`. That endpoint reports PSI of a rolling 5,000-score window against the deciles of the calibration window, plus flagged share, mean probability, unseen-category share and latency. The reference profile is stored in `model_metadata.json`. Retraining reproduced both joblib artifacts byte for byte.
+- 6 new tests cover PSI, drift bands, the rolling window, the API endpoint and log content. 28 tests pass and Ruff passes.
+- `monitoring_replay.py` replayed the 16,835 evaluation bookings by booking week (27 weeks with at least 200 bookings):
+  - The trailing-2,000-score PSI was ok in the first 2 weeks. From 2017-02-20 on, every week was a warning or an alert (21 alert weeks).
+  - Realised recall was below 80% in 26 of 27 weeks.
+  - PSI and recall correlate at −0.62.
+- The shift is mostly non-refundable bookings: 13.1% of the calibration window, 1.4% of the evaluation bookings.

@@ -6,6 +6,8 @@ risk bands and decision rules, so an API score and an app score never diverge.
 """
 
 from contextlib import asynccontextmanager
+import json
+import logging
 import os
 from pathlib import Path
 import time
@@ -23,6 +25,7 @@ from hotel_cancellation.decision import (
     risk_band,
 )
 from hotel_cancellation.model import load_model_bundle, local_contributions
+from hotel_cancellation.monitoring import ScoreMonitor
 
 
 ARTIFACT_DIR = Path(
@@ -32,6 +35,18 @@ ARTIFACT_DIR = Path(
     )
 )
 MAX_BATCH_SIZE = 1000
+# One JSON line per scored booking: enough to rebuild drift and, once outcomes arrive,
+# realised recall. Booking attributes are not logged.
+score_log = logging.getLogger("hotel_cancellation.scores")
+
+
+def configure_score_log() -> None:
+    """Send score lines to stdout as bare JSON; uvicorn only configures its own loggers."""
+    if not score_log.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        score_log.addHandler(handler)
+        score_log.setLevel(logging.INFO)
 
 Month = Literal[
     "January", "February", "March", "April", "May", "June",
@@ -162,6 +177,8 @@ class ScoreResponse(Score):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.bundle = load_model_bundle(ARTIFACT_DIR)
+    app.state.monitor = ScoreMonitor(app.state.bundle.metadata["monitoring_reference"])
+    configure_score_log()
     yield
 
 
@@ -201,11 +218,23 @@ def unseen_categories(booking: Booking, metadata: dict) -> dict[str, str]:
 
 
 def score_frame(request: Request, bookings: list[Booking]) -> tuple[pd.DataFrame, list[tuple[float, float]]]:
+    started = time.perf_counter()
     frame = pd.DataFrame([booking.model_dump() for booking in bookings])[FEATURES]
     try:
         scores, probabilities = request.app.state.bundle.score(frame)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    metadata = request.app.state.bundle.metadata
+    threshold = float(metadata["threshold"])
+    unseen = [bool(unseen_categories(booking, metadata)) for booking in bookings]
+    elapsed = (time.perf_counter() - started) * 1000
+    request.app.state.monitor.record(scores, probabilities, scores >= threshold, unseen, elapsed)
+    for score, probability, has_unseen in zip(scores, probabilities, unseen):
+        score_log.info(json.dumps({
+            "event": "booking_scored", "model_version": model_version(metadata),
+            "risk_score": round(float(score), 6), "probability": round(float(probability), 6),
+            "flagged": bool(score >= threshold), "unseen_category": has_unseen,
+        }))
     return frame, [(float(s), float(p)) for s, p in zip(scores, probabilities)]
 
 
@@ -269,6 +298,20 @@ def model_card(request: Request) -> dict:
         "features": metadata["features"],
         "category_options": metadata["category_options"],
         "limitations": metadata["limitations"],
+    }
+
+
+@app.get("/monitoring")
+def monitoring(request: Request) -> dict:
+    """Drift of recent scores against the window the threshold was set on.
+
+    Realised recall needs outcomes, which arrive after the stay; this view is the early
+    warning. ``psi`` >= 0.10 is a warning and >= 0.25 an alert (population stability index).
+    """
+    return {
+        "model_version": model_version(request.app.state.bundle.metadata),
+        "threshold": request.app.state.bundle.metadata["threshold"],
+        **request.app.state.monitor.summary(),
     }
 
 

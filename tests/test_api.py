@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import os
 import unittest
@@ -113,6 +114,23 @@ class ApiTests(unittest.TestCase):
             with self.subTest(booking=booking):
                 response = self.client.post("/predict", json={"booking": booking})
                 self.assertEqual(response.status_code, 422)
+
+    def test_monitoring_tracks_scored_traffic(self):
+        before = self.client.get("/monitoring").json()["bookings_scored_total"]
+        self.client.post("/predict/batch", json={"bookings": [EXAMPLE] * 250})
+        report = self.client.get("/monitoring").json()
+        self.assertEqual(report["bookings_scored_total"], before + 250)
+        self.assertEqual(report["threshold"], self.metadata["threshold"])
+        # 250 identical bookings fill one score decile: a maximal distribution shift.
+        self.assertEqual(report["status"], "alert")
+
+    def test_each_score_is_logged_without_booking_attributes(self):
+        with self.assertLogs("hotel_cancellation.scores", level="INFO") as logs:
+            self.client.post("/predict", json={"booking": EXAMPLE, "explain": False})
+        record = json.loads(logs.records[-1].getMessage())
+        self.assertEqual(record["event"], "booking_scored")
+        self.assertNotIn("country", record)
+        self.assertIn("risk_score", record)
 
     def test_batch_size_is_bounded(self):
         response = self.client.post(

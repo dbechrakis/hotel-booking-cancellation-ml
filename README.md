@@ -85,7 +85,7 @@ The class-weighted score averages 36% on later bookings while 29% cancel. Expect
 | Raw risk score | 0.182 | 0.073 | 36.4% vs 29.2% |
 | **Isotonic probability** | **0.174** | **0.013** | **28.8% vs 29.2%** |
 
-The threshold rule is "catch 80% of cancellations". It produced a risk-score cut of 0.372. On the later bookings that cut flagged 45% of bookings and caught **70%** of cancellations at **45%** precision, short of the 80% target. The cancellation rate fell from 37% to 29% between the two windows, so a fixed threshold drifts and needs monitoring. [Protocol, reliability diagram and history](docs/calibration.md).
+The threshold rule is "catch 80% of cancellations". It produced a risk-score cut of 0.372. On the later bookings that cut flagged 45% of bookings and caught **70%** of cancellations at **45%** precision, short of the 80% target. The cancellation rate fell from 37% to 29% between the two windows, so a fixed threshold drifts and needs monitoring (see [Monitoring](#monitoring)). [Protocol, reliability diagram and history](docs/calibration.md).
 
 [Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout scores and probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 
@@ -139,13 +139,15 @@ hotel-booking-cancellation-ml/
 │   ├── data.py                       # Matured chronological split
 │   ├── model.py                      # Training/inference/explanations
 │   ├── calibration.py                # Reliability, ECE, Brier diagnostics
+│   ├── monitoring.py                 # PSI drift monitor for live scores
 │   ├── decision.py                   # Risk bands, economics, experiment sizing
 │   └── api.py                        # FastAPI scoring service
 ├── notebooks/                        # Executed modelling study
 ├── scripts/
 │   ├── download_data.py              # Fingerprinted public source
 │   ├── train_decision_artifacts.py   # Reproducible export
-│   └── track_experiments.py          # MLflow comparison + model registry
+│   ├── track_experiments.py          # MLflow comparison + model registry
+│   └── monitoring_replay.py          # Weekly drift replay with hindsight outcomes
 ├── tests/                             # Decision, artifact and API tests
 ├── outputs/                           # Metrics, figures, holdout evidence
 ├── docs/                              # Architecture + archived reports
@@ -210,6 +212,7 @@ Without Docker: `python -m pip install -r requirements.txt -r requirements-dev.t
 | `GET /model` | Model card: holdout metrics, split, feature contract, category options, limitations |
 | `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at the review threshold, top signed contributions; optional economics → expected value and recommendation |
 | `POST /predict/batch` | Up to 1,000 bookings per request |
+| `GET /monitoring` | Score drift (PSI) of the last 5,000 scores against the threshold window, flagged share, unseen-category share, latency |
 
 ```bash
 curl -X POST localhost:8000/predict -H 'content-type: application/json' -d '{
@@ -226,7 +229,25 @@ Contract enforcement:
 - Every response carries `model_version` and an `X-Process-Time-Ms` header.
 - The threshold and `policy_threshold` apply to `risk_score`; risk bands and expected value use the calibrated `cancellation_probability`.
 
-CI builds the image, starts the container and checks a real prediction on every push. This is a portfolio service: it has no authentication, rate limiting, request logging or drift monitoring.
+CI builds the image, starts the container and checks a real prediction on every push. This is a portfolio service: it has no authentication or rate limiting.
+
+## Monitoring
+
+Outcomes arrive only after a booking's stay, so the live service cannot measure recall when it scores. It watches what it is fed instead:
+
+- **Score log.** One JSON line per scored booking: model version, risk score, probability, flag and unseen-category flag. Booking attributes are not logged. Joined with outcomes later, the log gives realised recall.
+- **`GET /monitoring`.** Compares a rolling window of the last 5,000 risk scores with the score deciles of the window where the threshold and calibrator were set. It reports the population stability index (PSI; ≥ 0.10 warn, ≥ 0.25 alert), the flagged share and mean probability against their reference values, the unseen-category share and latency.
+
+[`scripts/monitoring_replay.py`](scripts/monitoring_replay.py) replays the 16,835 later bookings week by week to test whether this would have caught the recall shortfall:
+
+![Weekly monitoring replay](outputs/monitoring/weekly_replay.png)
+
+- **The monitor would have alerted in the third week (2017-02-20) and stayed at warn or alert every week after, months before outcomes confirmed the shortfall.** Realised recall stayed below the 80% target in 26 of 27 weeks. Rolling PSI and weekly recall correlate at −0.62.
+- **The cause is visible in the scores.** Non-refundable bookings were 13.1% of the threshold window but 1.4% afterwards. These are near-certain cancellations (risk score ≥ 0.99) that had made 80% recall easy to reach. Once they disappear the top score decile empties, PSI jumps, and the remaining cancellations are harder to catch.
+- **Calibration held up better than the threshold.** The weekly mean calibrated probability stayed within 2.4 points of the observed cancellation rate on average. Action on an alert is to re-set the threshold on recent matured outcomes, not to retrain blindly.
+- PSI on single weeks is noisy because group bookings arrive in bursts, so the API and the replay use a rolling window.
+
+[Weekly table](outputs/monitoring/weekly_replay.csv) · [summary](outputs/monitoring/summary.json)
 
 ## Model interpretation and limitations
 

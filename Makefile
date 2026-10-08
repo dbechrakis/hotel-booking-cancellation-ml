@@ -1,7 +1,7 @@
 # Run the same checks as CI: `make check`. Override the interpreter with `make check PYTHON=python3.12`.
 PYTHON ?= python
 
-.PHONY: install check lint evidence test serve experiments docker
+.PHONY: install check lint evidence test serve experiments docker monitoring-replay
 
 install:
 	$(PYTHON) -m pip install -r requirements.txt -r requirements-dev.txt
@@ -25,3 +25,6 @@ experiments:
 
 docker:
 	docker build -t hotel-cancellation-api .
+
+monitoring-replay:
+	PYTHONPATH=src $(PYTHON) scripts/monitoring_replay.py

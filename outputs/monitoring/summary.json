@@ -1,0 +1,11 @@
+{
+  "weeks": 27,
+  "bookings": 16522,
+  "weeks_ok": 2,
+  "weeks_warn": 4,
+  "weeks_alert": 21,
+  "recall_target": 0.8,
+  "weeks_below_target_recall": 26,
+  "psi_recall_correlation": -0.6237429199678012,
+  "calibration_gap_mean_abs": 0.024369766440333476
+}

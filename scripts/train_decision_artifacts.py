@@ -29,6 +29,7 @@ from sklearn.metrics import (  # noqa: E402
 from hotel_cancellation.calibration import calibration_summary, reliability_table  # noqa: E402
 from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES  # noqa: E402
 from hotel_cancellation.data import chronological_split, feature_target, source_sha256  # noqa: E402
+from hotel_cancellation.monitoring import reference_profile  # noqa: E402
 from hotel_cancellation.model import (  # noqa: E402
     CALIBRATOR_FILE,
     MODEL_FILE,
@@ -200,6 +201,11 @@ def main() -> None:
         "threshold": threshold,
         "threshold_scale": "risk_score",
         "policy": policy,
+        # The score distribution the threshold and calibrator were set on; the API compares
+        # live traffic against it.
+        "monitoring_reference": reference_profile(
+            scores[calibration_rows], probabilities[calibration_rows], threshold
+        ),
         "features": FEATURES,
         "holdout_metrics": metrics,
         "calibration": calibration,

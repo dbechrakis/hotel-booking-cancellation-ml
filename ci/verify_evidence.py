@@ -45,4 +45,11 @@ policy=metadata['policy']
 assert policy['threshold']==metadata['threshold']
 assert sum(float(r['risk_score'])>=policy['threshold'] for r in predictions)==policy['holdout_flagged']
 
+weekly=table('outputs/monitoring/weekly_replay.csv')
+summary=json.loads((ROOT/'outputs/monitoring/summary.json').read_text())
+assert summary['weeks']==len(weekly) and summary['bookings']==sum(int(r['bookings']) for r in weekly)
+assert summary['weeks_below_target_recall']==sum(float(r['realised_recall'])<0.8 for r in weekly)
+assert set(metadata['monitoring_reference'])>={'bin_edges','bin_shares','flagged_share'}
+close(sum(metadata['monitoring_reference']['bin_shares']),1)
+
 print('Committed evidence and syntax checks passed; see VALIDATION.md for rerun scope.')
