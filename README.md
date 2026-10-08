@@ -4,9 +4,9 @@
 
 An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates model probabilities into transparent intervention-policy scenarios.
 
-**Stack:** Python · pandas · scikit-learn · SHAP · Streamlit · joblib
+**Stack:** Python · pandas · scikit-learn · SHAP · FastAPI · MLflow · Docker · Streamlit
 
-**[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
+**[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Scoring API](#scoring-api) · [Experiment tracking](docs/experiment-tracking.md) · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
 
 ## Decision in 60 seconds
 
@@ -62,6 +62,18 @@ The analysis uses all 119,390 rows from the public Hotel Booking Demand snapshot
 
 There is no universally best model. Random Forest ranks the holdout better, while Logistic Regression has stronger recall and F1 at the fixed 0.50 threshold. The deployed portfolio artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and exactly reproduces the committed chronological-holdout metrics.
 
+### Tracked model comparison
+
+[`scripts/track_experiments.py`](scripts/track_experiments.py) reruns the comparison under MLflow with a gradient-boosting candidate added. It selects on an inner chronological validation window inside the training period, then scores every candidate once on the holdout. It also records calibration (Brier score) and registers the deployed pipeline as `hotel-cancellation-risk@production`.
+
+| Model | Validation AP (selects) | Holdout AP | Holdout Brier |
+|---|---:|---:|---:|
+| Logistic Regression (deployed) | 0.470 | 0.644 | 0.216 |
+| Random Forest (selected) | **0.528** | 0.682 | 0.164 |
+| Hist Gradient Boosting | 0.517 | **0.695** | **0.163** |
+
+Validation and holdout disagree on the best tree model, so the holdout winner is not presented as the selected model. The deployed logistic scores rank well enough for a review queue but are poorly calibrated (Brier score close to the base-rate 0.218). [Protocol and full results](docs/experiment-tracking.md).
+
 [Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 
 ## Validation design
@@ -110,16 +122,21 @@ hotel-booking-cancellation-ml/
 │   ├── contracts.py                  # Explicit 22-feature contract
 │   ├── data.py                       # Matured chronological split
 │   ├── model.py                      # Training/inference/explanations
-│   └── decision.py                   # Risk bands, economics, experiment sizing
+│   ├── decision.py                   # Risk bands, economics, experiment sizing
+│   └── api.py                        # FastAPI scoring service
 ├── notebooks/                        # Executed modelling study
 ├── scripts/
 │   ├── download_data.py              # Fingerprinted public source
-│   └── train_decision_artifacts.py   # Reproducible export
-├── tests/                             # Decision and artifact tests
+│   ├── train_decision_artifacts.py   # Reproducible export
+│   └── track_experiments.py          # MLflow comparison + model registry
+├── tests/                             # Decision, artifact and API tests
 ├── outputs/                           # Metrics, figures, holdout evidence
 ├── docs/                              # Architecture + archived reports
+├── Dockerfile                         # Serving image for the API
 ├── pyproject.toml
-└── requirements.txt
+├── requirements.txt                   # Research + app environment
+├── requirements-api.txt               # Lean serving environment
+└── requirements-dev.txt               # API, MLflow and lint tooling
 ```
 
 ## Run locally
@@ -157,6 +174,41 @@ python -m unittest discover -s tests -v
 ```
 
 The export script refuses to continue if the source fingerprint or reproduced Logistic Regression metrics differ from the committed evidence.
+
+## Scoring API
+
+The same hash-verified artifact is served over REST with FastAPI. The service reuses the package's validation, risk bands and decision rules, so an API score and an app score cannot diverge. A test asserts that equality.
+
+```bash
+docker build -t hotel-cancellation-api .
+docker run -p 8000:8000 hotel-cancellation-api
+# Interactive OpenAPI docs: http://localhost:8000/docs
+```
+
+Without Docker: `python -m pip install -r requirements.txt -r requirements-dev.txt`, then `make serve`.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness plus the served artifact version (first 12 characters of its SHA-256) |
+| `GET /model` | Model card: holdout metrics, split, feature contract, category options, limitations |
+| `POST /predict` | One booking → probability, risk band, flag at 0.50, top signed contributions; optional economics → expected value and recommendation |
+| `POST /predict/batch` | Up to 1,000 bookings per request |
+
+```bash
+curl -X POST localhost:8000/predict -H 'content-type: application/json' -d '{
+  "booking": '"$(cat docs/api-example-booking.json)"',
+  "economics": {"recoverable_margin": 200, "intervention_cost": 5, "intervention_success_rate": 0.2}
+}'
+```
+
+Contract enforcement:
+
+- Unknown fields are rejected with `422`. Sending a post-outcome field such as `reservation_status` cannot silently leak into a score.
+- Ranges, months, guests and stay nights are validated before scoring.
+- A categorical value never seen in training is scored, because the encoder ignores it. The response lists it in `unseen_categories` so the caller knows the score used less information.
+- Every response carries `model_version` and an `X-Process-Time-Ms` header.
+
+CI builds the image, starts the container and checks a real prediction on every push. This is a portfolio service: it has no authentication, rate limiting, request logging or drift monitoring.
 
 ## Model interpretation and limitations
 
