@@ -1,10 +1,9 @@
 """Train and export the compact cancellation decision-system artifacts.
 
-Exports the ranking pipeline and an isotonic calibrator. The calibrator is fitted on the
-earliest 30% of post-cutoff bookings and evaluated on the later 70%, mirroring how a
-deployed score would be recalibrated on its most recent matured outcomes. A calibrator
-fitted inside the training period does not transfer: ``arrival_date_year`` is numeric,
-so a model fitted on an earlier window scores a very different range than the final model.
+Exports the ranking pipeline, an isotonic calibrator and a review threshold. The
+calibrator and the threshold are both chosen on the earliest 30% of post-cutoff bookings
+and evaluated on the later 70%, mirroring how a deployed score would be recalibrated and
+re-thresholded on its most recent matured outcomes. The later 70% is never used to choose.
 """
 
 from pathlib import Path
@@ -15,6 +14,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import sklearn  # noqa: E402
 from sklearn.metrics import (  # noqa: E402
@@ -47,11 +47,19 @@ CALIBRATOR_PATH = ARTIFACT_DIR / CALIBRATOR_FILE
 METADATA_PATH = ARTIFACT_DIR / "model_metadata.json"
 PREDICTIONS_PATH = OUTPUT_DIR / "holdout_predictions.csv.gz"
 EXPECTED_SOURCE_SHA = "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06"
-THRESHOLD = 0.5
+METRIC_THRESHOLD = 0.5  # the notebook's fixed comparison threshold, used to reproduce it
+TARGET_RECALL = 0.80  # policy: the review queue should catch four in five cancellations
 # The logistic fit converges to tol=1e-8, so refits on other BLAS builds agree with the
 # notebook's committed metrics to about 1e-7; a looser fit drifted by up to 1e-3.
 REPRODUCTION_TOLERANCE = 1e-6
 CALIBRATION_SHARE = 0.3
+
+
+def recall_threshold(scores, outcomes, target_recall: float) -> float:
+    """Highest score threshold whose flagged set still catches ``target_recall`` of positives."""
+    positive_scores = np.sort(scores[outcomes == 1])[::-1]
+    needed = int(np.ceil(target_recall * len(positive_scores)))
+    return float(positive_scores[needed - 1])
 
 
 def plot_reliability(tables: dict[str, pd.DataFrame], path: Path) -> None:
@@ -85,7 +93,7 @@ def main() -> None:
     test_features = features.loc[split.test_mask]
     test_target = target.loc[split.test_mask]
     scores = pipeline.predict_proba(test_features)[:, 1]
-    predictions = (scores >= THRESHOLD).astype(int)
+    predictions = (scores >= METRIC_THRESHOLD).astype(int)
 
     metrics = {
         "accuracy": accuracy_score(test_target, predictions),
@@ -108,7 +116,21 @@ def main() -> None:
     calibration_cutoff = booking_date.sort_values().iloc[int(len(booking_date) * CALIBRATION_SHARE)]
     calibration_rows = (booking_date < calibration_cutoff).to_numpy()
     evaluation_rows = ~calibration_rows
-    calibrator = fit_calibrator(scores[calibration_rows], test_target.to_numpy()[calibration_rows])
+    calibration_target = test_target.to_numpy()[calibration_rows]
+    calibrator = fit_calibrator(scores[calibration_rows], calibration_target)
+    threshold = recall_threshold(scores[calibration_rows], calibration_target, TARGET_RECALL)
+    evaluation_flagged = scores[evaluation_rows] >= threshold
+    evaluation_truth = test_target.to_numpy()[evaluation_rows]
+    policy = {
+        "rule": f"highest risk-score threshold reaching {TARGET_RECALL:.0%} recall on the calibration window",
+        "threshold": threshold,
+        "evaluation_flagged_share": float(evaluation_flagged.mean()),
+        "evaluation_precision": precision_score(evaluation_truth, evaluation_flagged),
+        "evaluation_recall": recall_score(evaluation_truth, evaluation_flagged),
+        "evaluation_f1": f1_score(evaluation_truth, evaluation_flagged),
+        "holdout_flagged": int((scores >= threshold).sum()),
+        "holdout_flagged_cancellation_rate": float(test_target.to_numpy()[scores >= threshold].mean()),
+    }
     probabilities = calibrator.predict(scores)
     evaluation_target = test_target.to_numpy()[evaluation_rows]
 
@@ -175,8 +197,9 @@ def main() -> None:
         "train_rows": int(split.train_mask.sum()),
         "test_rows": int(split.test_mask.sum()),
         "purged_rows": int(split.purged_mask.sum()),
-        "threshold": THRESHOLD,
+        "threshold": threshold,
         "threshold_scale": "risk_score",
+        "policy": policy,
         "features": FEATURES,
         "holdout_metrics": metrics,
         "calibration": calibration,
@@ -186,7 +209,6 @@ def main() -> None:
         "limitations": [
             "one later historical holdout",
             "calibration uses early post-cutoff outcomes; operationally they mature only after those stays",
-            "arrival_date_year is numeric, so raw scores extrapolate beyond the training years",
             "intervention effectiveness is not observed in this dataset",
             "SHAP and logistic contributions are associative, not causal",
         ],
@@ -195,6 +217,7 @@ def main() -> None:
 
     print(f"Saved {MODEL_PATH.name} and {CALIBRATOR_PATH.name}; {len(prediction_output):,} holdout rows")
     print(pd.Series(metrics).round(4).to_string())
+    print(json.dumps(policy, indent=2))
     print(json.dumps({k: calibration[k] for k in ["evaluation_uncalibrated", "evaluation_calibrated"]}, indent=2))
 
 

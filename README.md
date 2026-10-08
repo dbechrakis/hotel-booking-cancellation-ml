@@ -12,7 +12,7 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 | Question | Evidence | Decision supported | Boundary |
 |---|---|---|---|
-| Which bookings merit a limited retention review? | A logistic model achieved **0.591 F1** and **0.812 recall** at a 0.50 risk-score cutoff on **23,989 later bookings**. Isotonic calibration cut the probability calibration error from **0.221 to 0.013** on later bookings. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
+| Which bookings merit a limited retention review? | A logistic model ranks **23,989 later bookings** with **0.646 average precision** (base rate 0.315). A review threshold set for 80% recall on early post-cutoff bookings caught **70% of cancellations at 45% precision** on the 16,835 later ones. Isotonic calibration brings probability calibration error to **0.013**. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
 
 [Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
 
@@ -57,10 +57,12 @@ The analysis uses all 119,390 rows from the public Hotel Booking Demand snapshot
 | Model | F1 | Precision | Recall | Average precision | ROC AUC |
 |---|---:|---:|---:|---:|---:|
 | Prior baseline | 0.0000 | 0.0000 | 0.0000 | 0.3152 | 0.5000 |
-| **Logistic Regression** | **0.5905** | 0.4641 | **0.8115** | 0.6444 | 0.7750 |
-| Random Forest | 0.5784 | **0.6017** | 0.5569 | **0.6819** | **0.8089** |
+| Logistic Regression | 0.5435 | 0.5788 | 0.5122 | 0.6457 | 0.7753 |
+| **Random Forest** | **0.5685** | **0.6061** | **0.5354** | **0.6797** | **0.8080** |
 
-There is no universally best model. Random Forest ranks the holdout better, while Logistic Regression has stronger recall and F1 at the fixed 0.50 threshold. The deployed portfolio artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and exactly reproduces the committed chronological-holdout metrics.
+These are threshold-free ranking scores plus a fixed 0.50 comparison point. The deployed review threshold is chosen separately (below). Random Forest ranks the holdout better. The deployed artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and reproduces the committed chronological-holdout metrics.
+
+`arrival_date_year` is not a model input. As a numeric feature it pushed every later booking beyond the training years, which inflated scores by about 14 points. Removing it slightly improved ranking (AP 0.644 → 0.646). It also brought the raw-score Brier score from 0.229 to 0.182, and turned the retrospective lead-time regression from R² −1.83 into +0.06 (Ridge).
 
 ### Tracked model comparison
 
@@ -68,22 +70,22 @@ There is no universally best model. Random Forest ranks the holdout better, whil
 
 | Model | Validation AP (selects) | Holdout AP | Holdout Brier |
 |---|---:|---:|---:|
-| Logistic Regression (deployed, raw score) | 0.467 | 0.644 | 0.218 |
-| Random Forest (selected) | **0.528** | 0.682 | 0.164 |
-| Hist Gradient Boosting | 0.517 | **0.695** | **0.163** |
+| Logistic Regression (deployed, raw score) | 0.471 | 0.646 | 0.175 |
+| Random Forest (selected) | **0.502** | 0.680 | 0.163 |
+| Hist Gradient Boosting | 0.449 | **0.690** | **0.161** |
 
-Validation and holdout disagree on the best tree model, so the holdout winner is not presented as the selected model. The raw logistic score ranks well enough for a review queue, but it is not a probability: its Brier score equals the base-rate 0.218. [Protocol and full results](docs/experiment-tracking.md).
+Validation and holdout disagree on the best tree model, so the holdout winner is not presented as the selected model. Gradient boosting has the weakest validation score but the best holdout score. That is exactly the case where choosing on the holdout would overstate performance. [Protocol and full results](docs/experiment-tracking.md).
 
-### Calibrated probabilities
+### Calibrated probabilities and the review threshold
 
-The class-weighted score averages 51% on later bookings while 29% cancel. Expected intervention value multiplies a probability by money, so it needs calibration. The system serves the raw **risk score** for ranking and the 0.50 threshold, and an **isotonic-calibrated probability** for risk bands and economics. The calibrator was fitted on the earliest 30% of later bookings and evaluated on the other 16,835:
+The class-weighted score averages 36% on later bookings while 29% cancel. Expected intervention value multiplies a probability by money, so it needs calibration. The system serves the raw **risk score** for ranking and the review threshold, and an **isotonic-calibrated probability** for risk bands and economics. The calibrator and the threshold were chosen on the earliest 30% of later bookings and evaluated on the other 16,835:
 
 | | Brier | ECE | Mean predicted vs observed |
 |---|---:|---:|---:|
-| Raw risk score | 0.229 | 0.221 | 51.2% vs 29.2% |
-| **Isotonic probability** | **0.174** | **0.013** | **30.1% vs 29.2%** |
+| Raw risk score | 0.182 | 0.073 | 36.4% vs 29.2% |
+| **Isotonic probability** | **0.174** | **0.013** | **28.8% vs 29.2%** |
 
-A calibrator fitted inside the training period did not transfer, because `arrival_date_year` is numeric and scores extrapolate by year. [Protocol, reliability diagram and the failed attempt](docs/calibration.md).
+The threshold rule is "catch 80% of cancellations". It produced a risk-score cut of 0.372. On the later bookings that cut flagged 45% of bookings and caught **70%** of cancellations at **45%** precision, short of the 80% target. The cancellation rate fell from 37% to 29% between the two windows, so a fixed threshold drifts and needs monitoring. [Protocol, reliability diagram and history](docs/calibration.md).
 
 [Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout scores and probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 
@@ -95,7 +97,7 @@ A calibrator fitted inside the training period did not transfer, because `arriva
 - **Cutoff:** 2017-01-12.
 - Imputation, scaling, and encoding are fitted on training data only.
 - Final reservation status, assigned room, booking changes, waiting-list duration, and mutable request/parking counts are excluded.
-- Classification threshold 0.50 was not tuned on the test data.
+- The 0.50 comparison threshold is fixed; the deployed review threshold is chosen on the first 30% of later bookings only.
 - The source file and exported model are protected by SHA-256 fingerprints.
 
 The design reduces obvious temporal and outcome leakage. It does not prove stability across future seasons, new hotels, or changed operating policies.
@@ -133,7 +135,7 @@ hotel-booking-cancellation-ml/
 │   ├── cancellation_calibrator.joblib # Isotonic calibrator (probability)
 │   └── model_metadata.json           # Contract, metrics, defaults, hashes
 ├── src/hotel_cancellation/
-│   ├── contracts.py                  # Explicit 22-feature contract
+│   ├── contracts.py                  # Explicit 21-feature contract
 │   ├── data.py                       # Matured chronological split
 │   ├── model.py                      # Training/inference/explanations
 │   ├── calibration.py                # Reliability, ECE, Brier diagnostics
@@ -206,7 +208,7 @@ Without Docker: `python -m pip install -r requirements.txt -r requirements-dev.t
 |---|---|
 | `GET /health` | Liveness plus the served artifact version (first 12 characters of its SHA-256) |
 | `GET /model` | Model card: holdout metrics, split, feature contract, category options, limitations |
-| `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at 0.50, top signed contributions; optional economics → expected value and recommendation |
+| `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at the review threshold, top signed contributions; optional economics → expected value and recommendation |
 | `POST /predict/batch` | Up to 1,000 bookings per request |
 
 ```bash

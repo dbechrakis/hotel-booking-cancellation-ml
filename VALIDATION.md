@@ -42,3 +42,15 @@ The app is a portfolio decision-support demonstration. No intervention success o
 - A first attempt calibrated on an inner window inside the training period. It worsened calibration on later bookings (49.5% predicted vs 31.5% observed) because `arrival_date_year` extrapolates. It was not adopted; see `docs/calibration.md`.
 - The API, the Streamlit app and the threshold simulator now separate the risk score (ranking and threshold) from the calibrated probability (risk bands and expected value).
 - With pinned dependencies on Python 3.12: 22 tests pass, Ruff passes and the evidence check passes. A Streamlit AppTest scored the default booking without exceptions: risk score 0.88, calibrated probability 60.1%.
+
+## Removed arrival_date_year; review threshold chosen by rule — 2026-10-08
+
+- `arrival_date_year` is no longer a model input; the contract now has 21 features. As a numeric input it extrapolated beyond the training years and inflated later-booking scores by about 14 points.
+- The notebook was re-executed without the feature.
+  - Logistic Regression: AP 0.6457, ROC AUC 0.7753, and F1 0.5435 at the fixed 0.50 comparison threshold.
+  - Random Forest: AP 0.6797, ROC AUC 0.8080.
+  - The lead-time regression improved: Ridge R² −1.83 → +0.06, gradient boosting 0.15 → 0.29.
+- The review threshold is now chosen as the highest risk score reaching 80% recall on the calibration window (the first 30% of later bookings). The result is 0.372. On the 16,835 evaluation bookings it flagged 44.8% and reached 69.6% recall at 45.3% precision, short of the target.
+- The isotonic calibrator was refitted on the same window. On evaluation bookings, Brier fell 0.182 → 0.174 and ECE 0.073 → 0.013.
+- The API and the app no longer take an arrival year. Their flag and the app's default thresholds use the policy threshold.
+- With pinned dependencies on Python 3.12: 22 tests pass, Ruff passes and the evidence check passes. A Streamlit AppTest scored the default booking without exceptions (risk score 0.78, calibrated probability 55.8%).

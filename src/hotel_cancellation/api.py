@@ -40,7 +40,7 @@ Month = Literal[
 
 
 class Booking(BaseModel):
-    """The explicit 22-feature booking contract, known before the outcome."""
+    """The explicit 21-feature booking contract, known before the outcome."""
 
     model_config = ConfigDict(
         extra="forbid",
@@ -48,7 +48,6 @@ class Booking(BaseModel):
             "example": {
                 "hotel": "City Hotel",
                 "lead_time": 120,
-                "arrival_date_year": 2017,
                 "arrival_date_month": "May",
                 "arrival_date_week_number": 20,
                 "arrival_date_day_of_month": 15,
@@ -74,7 +73,6 @@ class Booking(BaseModel):
 
     hotel: str
     lead_time: int = Field(ge=0, le=800)
-    arrival_date_year: int = Field(ge=2015, le=2100)
     arrival_date_month: Month
     arrival_date_week_number: int = Field(ge=1, le=53)
     arrival_date_day_of_month: int = Field(ge=1, le=31)

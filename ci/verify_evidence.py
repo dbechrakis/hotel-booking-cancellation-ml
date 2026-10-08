@@ -41,5 +41,8 @@ assert len(predictions)==v['test_rows']
 assert sum(int(r['is_canceled']) for r in predictions)/len(predictions)==v['test_cancellation_rate']
 assert all(0<=float(r['risk_score'])<=1 and 0<=float(r['cancellation_probability'])<=1 for r in predictions)
 assert sum(r['calibration_role']=='calibration' for r in predictions)==cal['calibration_rows']
+policy=metadata['policy']
+assert policy['threshold']==metadata['threshold']
+assert sum(float(r['risk_score'])>=policy['threshold'] for r in predictions)==policy['holdout_flagged']
 
 print('Committed evidence and syntax checks passed; see VALIDATION.md for rerun scope.')

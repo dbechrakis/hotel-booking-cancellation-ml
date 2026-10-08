@@ -61,7 +61,7 @@ class ApiTests(unittest.TestCase):
         scores, probabilities = self.bundle.score(pd.DataFrame([EXAMPLE]))
         self.assertAlmostEqual(body["risk_score"], float(scores[0]), places=12)
         self.assertAlmostEqual(body["cancellation_probability"], float(probabilities[0]), places=12)
-        self.assertEqual(body["flagged"], scores[0] >= 0.5)
+        self.assertEqual(body["flagged"], scores[0] >= self.metadata["threshold"])
         self.assertEqual(len(body["contributions"]), 6)
         self.assertIsNone(body["decision"])
         self.assertEqual(body["unseen_categories"], {})

@@ -19,7 +19,7 @@ flowchart TD
 |---|---|
 | Source → training | SHA-256 must match the validated 119,390-row snapshot |
 | Raw data → split | Training booking, stay end, and resolved outcome precede cutoff; test booking is on/after cutoff |
-| Split → model | Explicit 22-feature contract; leakage and mutable outcome-proxy fields excluded |
+| Split → model | Explicit 21-feature contract; leakage and mutable outcome-proxy fields excluded, and `arrival_date_year` excluded because it extrapolates |
 | Model → artifact | Reproduced holdout metrics must match committed results before export |
 | Artifact → app | Artifact hash, feature order, and exact scikit-learn version are verified |
 | Booking → score | Non-negative ADR, at least one guest, and at least one night |
@@ -29,7 +29,7 @@ flowchart TD
 
 ## Why Logistic Regression is deployed
 
-The Random Forest has stronger average precision and ROC AUC on the later-period holdout. Logistic Regression is deployed because it is a compact artifact, has higher recall/F1 at the documented 0.50 threshold, and supports transparent signed feature contributions. This is an implementation choice, not a claim that Logistic Regression dominates every operating objective.
+The Random Forest has stronger average precision and ROC AUC on the later-period holdout. Logistic Regression is deployed because it is a compact artifact, its ranking is close enough for a review queue, and it supports transparent signed feature contributions. This is an implementation choice, not a claim that Logistic Regression dominates every operating objective.
 
 ## Trust boundaries
 

@@ -1,7 +1,6 @@
 {
   "hotel": "City Hotel",
   "lead_time": 120,
-  "arrival_date_year": 2017,
   "arrival_date_month": "May",
   "arrival_date_week_number": 20,
   "arrival_date_day_of_month": 15,

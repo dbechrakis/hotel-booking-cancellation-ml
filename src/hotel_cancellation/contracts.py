@@ -2,7 +2,6 @@
 
 NUMERIC_FEATURES = [
     "lead_time",
-    "arrival_date_year",
     "arrival_date_week_number",
     "arrival_date_day_of_month",
     "stays_in_weekend_nights",
@@ -31,7 +30,6 @@ CATEGORICAL_FEATURES = [
 FEATURES = [
     "hotel",
     "lead_time",
-    "arrival_date_year",
     "arrival_date_month",
     "arrival_date_week_number",
     "arrival_date_day_of_month",
@@ -53,6 +51,11 @@ FEATURES = [
     "adr",
 ]
 TARGET = "is_canceled"
+
+# arrival_date_year is known before the outcome, but as a numeric input it extrapolates:
+# every later booking falls beyond the training years and scores were inflated by about
+# 14 points. Seasonality stays in the month, week and day features.
+EXCLUDED_EXTRAPOLATING_FIELDS = {"arrival_date_year"}
 
 EXCLUDED_LEAKAGE_FIELDS = {
     "reservation_status",

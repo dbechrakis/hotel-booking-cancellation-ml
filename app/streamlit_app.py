@@ -37,7 +37,7 @@ def numeric_default(metadata: dict, feature: str) -> float:
 
 
 def booking_form(metadata: dict) -> dict:
-    """Collect the explicit 22-feature booking contract."""
+    """Collect the explicit 21-feature booking contract."""
     with st.expander("Booking and stay", expanded=True):
         left, middle, right = st.columns(3)
         with left:
@@ -54,7 +54,6 @@ def booking_form(metadata: dict) -> dict:
                 metadata, "reserved_room_type", "Reserved room type"
             )
         with middle:
-            arrival_date_year = st.selectbox("Arrival year", [2015, 2016, 2017], index=1)
             arrival_date_month = categorical_input(
                 metadata, "arrival_date_month", "Arrival month"
             )
@@ -114,7 +113,6 @@ def booking_form(metadata: dict) -> dict:
     return {
         "hotel": hotel,
         "lead_time": lead_time,
-        "arrival_date_year": arrival_date_year,
         "arrival_date_month": arrival_date_month,
         "arrival_date_week_number": arrival_date_week_number,
         "arrival_date_day_of_month": arrival_date_day_of_month,
@@ -167,7 +165,9 @@ def main() -> None:
         success_rate = c3.slider(
             "Intervention success rate", 0.0, 1.0, 0.25, 0.05
         )
-        policy_threshold = c4.slider("Policy threshold (risk score)", 0.10, 0.90, 0.50, 0.05)
+        policy_threshold = c4.slider(
+            "Policy threshold (risk score)", 0.05, 0.90, round(float(metadata["threshold"]), 2), 0.01
+        )
 
         if st.button("Score booking", type="primary"):
             booking = pd.DataFrame([inputs], columns=FEATURES)
@@ -212,7 +212,8 @@ def main() -> None:
             key="policy_success",
         )
         selected_threshold = st.slider(
-            "Decision threshold (risk score)", 0.10, 0.90, 0.50, 0.05,
+            "Decision threshold (risk score)", 0.10, 0.90,
+            round(float(metadata["threshold"]) * 20) / 20, 0.05,
             key="simulator_threshold",
         )
         table = threshold_table(
@@ -241,6 +242,13 @@ def main() -> None:
         e1, e2, e3, e4 = st.columns(4)
         e1.metric("Holdout rows", f"{metadata['test_rows']:,}")
         e2.metric("F1 at 0.50", f"{metrics['f1']:.3f}")
+        policy = metadata["policy"]
+        st.markdown(
+            f"**Review threshold {policy['threshold']:.3f}**: {policy['rule']}. On the later "
+            f"evaluation bookings it flagged {policy['evaluation_flagged_share']:.0%} and caught "
+            f"{policy['evaluation_recall']:.0%} of cancellations at {policy['evaluation_precision']:.0%} precision. "
+            "That is below the 80% target because the cancellation mix shifted, so the threshold needs monitoring."
+        )
         e3.metric("Average precision", f"{metrics['average_precision']:.3f}")
         e4.metric("ROC AUC", f"{metrics['roc_auc']:.3f}")
         calibration = metadata["calibration"]

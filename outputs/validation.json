@@ -10,7 +10,6 @@
   "features": [
     "hotel",
     "lead_time",
-    "arrival_date_year",
     "arrival_date_month",
     "arrival_date_week_number",
     "arrival_date_day_of_month",
