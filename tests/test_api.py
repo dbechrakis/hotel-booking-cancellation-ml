@@ -38,6 +38,11 @@ class ApiTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.client_context.__exit__(None, None, None)
 
+    def test_root_redirects_to_the_interactive_docs(self):
+        response = self.client.get("/", follow_redirects=False)
+        self.assertIn(response.status_code, (302, 307))
+        self.assertEqual(response.headers["location"], "/docs")
+
     def test_health_reports_artifact_version(self):
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)

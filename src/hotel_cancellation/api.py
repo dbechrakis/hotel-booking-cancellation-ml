@@ -14,6 +14,7 @@ import time
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -272,6 +273,12 @@ def build_score(
         unseen_categories=unseen_categories(booking, metadata),
         decision=decision,
     )
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    """Send visitors, and the Hugging Face Space preview, to the interactive docs."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
