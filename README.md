@@ -12,7 +12,7 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 | Question | Evidence | Decision supported | Boundary |
 |---|---|---|---|
-| Which bookings merit a limited retention review? | A logistic model ranks **23,989 later bookings** with **0.646 average precision** (base rate 0.315). A review threshold set for 80% recall on early post-cutoff bookings caught **70% of cancellations at 45% precision** on the 16,835 later ones. Isotonic calibration brings probability calibration error to **0.013**. | Explore a review threshold and contact capacity using the holdout simulator; prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
+| Which bookings merit a limited retention review? | A logistic model ranks **23,989 later bookings** with **0.646 average precision** (base rate 0.315). A review threshold set for 80% recall on early post-cutoff bookings caught **70% of cancellations at 45% precision** on the 16,835 later ones. Isotonic calibration brings probability calibration error to **0.013**. | Explore a review threshold and contact capacity using the holdout simulator. Prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
 
 [Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
 
@@ -20,7 +20,7 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 ![Live Hotel app scoring a sample booking and showing model contributions](docs/live-app-scoring.jpg)
 
-The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions; the displayed economic value is a scenario, not measured intervention uplift.
+The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions. The displayed economic value is a scenario, not measured intervention uplift.
 
 ## Business problem
 
@@ -31,7 +31,7 @@ Hotels cannot contact every booking with the same retention effort. A useful sys
 - Under explicit assumptions about intervention cost and effectiveness, which policy has positive expected value?
 - Which booking attributes pushed an individual score higher or lower?
 
-This repository separates those questions. The model estimates historical cancellation risk; the decision layer applies user-controlled economics. It does **not** claim that contacting a guest causally prevents cancellation.
+This repository separates those questions. The model estimates historical cancellation risk. The decision layer applies user-controlled economics. It does **not** claim that contacting a guest causally prevents cancellation.
 
 ## Product flow
 
@@ -46,9 +46,9 @@ flowchart TD
 
 The Streamlit application has three connected views:
 
-1. **Score a booking** — probability, risk band, assumed intervention value, recommendation, and largest logistic contributions.
-2. **Threshold simulator** — workload, precision, recall, missed cancellations, and assumed net value across thresholds on the later-period holdout.
-3. **Model evidence** — validation design, row counts, metrics, and explicit limitations.
+1. **Score a booking.** Probability, risk band, assumed intervention value, recommendation, and largest logistic contributions.
+2. **Threshold simulator.** Workload, precision, recall, missed cancellations, and assumed net value across thresholds on the later-period holdout.
+3. **Model evidence.** Validation design, row counts, metrics, and explicit limitations.
 
 ## Validated model evidence
 
@@ -97,7 +97,7 @@ The threshold rule is "catch 80% of cancellations". It produced a risk-score cut
 - **Cutoff:** 2017-01-12.
 - Imputation, scaling, and encoding are fitted on training data only.
 - Final reservation status, assigned room, booking changes, waiting-list duration, and mutable request/parking counts are excluded.
-- The 0.50 comparison threshold is fixed; the deployed review threshold is chosen on the first 30% of later bookings only.
+- The 0.50 comparison threshold is fixed. The deployed review threshold is chosen on the first 30% of later bookings only.
 - The source file and exported model are protected by SHA-256 fingerprints.
 
 The design reduces obvious temporal and outcome leakage. It does not prove stability across future seasons, new hotels, or changed operating policies.
@@ -174,13 +174,13 @@ The committed model artifact and holdout predictions are enough to run the appli
 The artifact is a pickled scikit-learn pipeline, so it loads only under the exact
 version that exported it (**scikit-learn 1.8.0**, recorded in
 [`model_metadata.json`](artifacts/model_metadata.json)). Install the pinned
-requirements above; with another version the app stops with an explicit message,
+requirements above. With another version the app stops with an explicit message,
 and you can rebuild the artifact for your environment with the training commands below.
 
 For Streamlit Community Cloud, select this repository's `main` branch, set the
 entrypoint to `app/streamlit_app.py`, and choose Python 3.12 in advanced settings.
 The app-specific [`app/requirements.txt`](app/requirements.txt) installs only
-the runtime dependencies; the root requirements file remains for reproducing
+the runtime dependencies. The root requirements file remains for reproducing
 the full modelling study. The application uses the committed artifact and
 historical holdout, so deployment does not download or retrain source data.
 
@@ -210,7 +210,7 @@ Without Docker: `python -m pip install -r requirements.txt -r requirements-dev.t
 |---|---|
 | `GET /health` | Liveness plus the served artifact version (first 12 characters of its SHA-256) |
 | `GET /model` | Model card: holdout metrics, split, feature contract, category options, limitations |
-| `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at the review threshold, top signed contributions; optional economics → expected value and recommendation |
+| `POST /predict` | One booking → risk score, calibrated probability, risk band, flag at the review threshold, top signed contributions. Optional economics → expected value and recommendation |
 | `POST /predict/batch` | Up to 1,000 bookings per request |
 | `GET /monitoring` | Score drift (PSI) of the last 5,000 scores against the threshold window, flagged share, unseen-category share, latency |
 
@@ -236,7 +236,7 @@ CI builds the image, starts the container and checks a real prediction on every 
 Outcomes arrive only after a booking's stay, so the live service cannot measure recall when it scores. It watches what it is fed instead:
 
 - **Score log.** One JSON line per scored booking: model version, risk score, probability, flag and unseen-category flag. Booking attributes are not logged. Joined with outcomes later, the log gives realised recall.
-- **`GET /monitoring`.** Compares a rolling window of the last 5,000 risk scores with the score deciles of the window where the threshold and calibrator were set. It reports the population stability index (PSI; ≥ 0.10 warn, ≥ 0.25 alert), the flagged share and mean probability against their reference values, the unseen-category share and latency.
+- **`GET /monitoring`.** Compares a rolling window of the last 5,000 risk scores with the score deciles of the window where the threshold and calibrator were set. It reports the population stability index (PSI, warn at ≥ 0.10 and alert at ≥ 0.25), the flagged share and mean probability against their reference values, the unseen-category share and latency.
 
 [`scripts/monitoring_replay.py`](scripts/monitoring_replay.py) replays the 16,835 later bookings week by week to test whether this would have caught the recall shortfall:
 
@@ -251,10 +251,10 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 
 ## Model interpretation and limitations
 
-- Logistic contributions explain the score mechanically; they are not causal effects.
+- Logistic contributions explain the score mechanically. They are not causal effects.
 - The risk score is a ranking tool, not a guarantee for an individual booking.
-- The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones; a shift in the cancellation base rate would require recalibration.
-- The threshold simulator reuses one historical holdout for scenario exploration; it is not a second independent validation.
+- The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones. A shift in the cancellation base rate would require recalibration.
+- The threshold simulator reuses one historical holdout for scenario exploration. It is not a second independent validation.
 - Intervention effectiveness, guest response, margin recovery, and contact cost are not observed in the dataset.
 - Before operational use, the system would require repeated temporal backtesting, calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
 
@@ -262,10 +262,10 @@ See [VALIDATION.md](VALIDATION.md) and [architecture contracts](docs/architectur
 
 ## Context and authorship
 
-Applied machine-learning portfolio project by **Dimitris Bechrakis**, MSc Data Science at **The American College of Greece**. The historical office documents and older `figures/` directory are retained as archived project material; the notebook, artifacts, tests, and `outputs/` are the current evidence.
+Applied machine-learning portfolio project by **Dimitris Bechrakis**, MSc Data Science at **The American College of Greece**. The historical office documents and older `figures/` directory are retained as archived project material. The notebook, artifacts, tests, and `outputs/` are the current evidence.
 
 Business Analyst | Commercial Analytics · Data Products · Applied Data Science
 
 ## Licensing
 
-The application, package, scripts and tests are MIT-licensed; data-derived artifacts and archived coursework are excluded. See [LICENSING.md](LICENSING.md) for the exact scope.
+The application, package, scripts and tests are MIT-licensed. Data-derived artifacts and archived coursework are excluded. See [LICENSING.md](LICENSING.md) for the exact scope.
