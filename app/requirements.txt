@@ -6,4 +6,4 @@ numpy==2.3.5
 scikit-learn==1.8.0
 scipy==1.17.0
 joblib==1.5.3
-streamlit==1.45.1
+streamlit==1.54.0
