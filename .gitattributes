@@ -1,0 +1,2 @@
+# Keep the language bar about the service code. The notebooks stay in the repository and render as usual.
+*.ipynb linguist-documentation
