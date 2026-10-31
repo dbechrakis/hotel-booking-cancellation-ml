@@ -64,6 +64,17 @@ These are threshold-free ranking scores plus a fixed 0.50 comparison point. The 
 
 `arrival_date_year` is not a model input. As a numeric feature it pushed every later booking beyond the training years, which inflated scores by about 14 points. Removing it slightly improved ranking (AP 0.644 → 0.646). It also brought the raw-score Brier score from 0.229 to 0.182, and turned the retrospective lead-time regression from R² −1.83 into +0.06 (Ridge).
 
+Which inputs carry the ranking was checked once by refitting the deployed Logistic Regression on the same chronological split with one input removed. This check is not part of CI.
+
+| Input removed | ROC-AUC | Average precision |
+|---|---:|---:|
+| None | 0.7753 | 0.6457 |
+| `deposit_type` | 0.7710 | 0.6093 |
+| `country` | 0.7432 | 0.6224 |
+| `lead_time` | 0.7645 | 0.6336 |
+
+`country` matters most for ranking. `deposit_type` costs little AUC, but it costs 0.036 of average precision because non-refundable bookings cancel almost always (99.2% in training). That is a known property of this dataset and the reason the score distribution shifts after the threshold window, as described under [Monitoring](#monitoring).
+
 ### Tracked model comparison
 
 [`scripts/track_experiments.py`](scripts/track_experiments.py) reruns the comparison under MLflow with a gradient-boosting candidate added. It selects on an inner chronological validation window inside the training period, then scores every candidate once on the holdout. It also records calibration (Brier score) and registers the deployed pipeline as `hotel-cancellation-risk@production`.
