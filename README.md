@@ -4,6 +4,8 @@
 
 An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates calibrated probabilities into transparent intervention-policy scenarios.
 
+**Result:** On 16,835 later bookings, the review threshold flags 45% of bookings and catches 70% of cancellations at 45% precision. Calibrated probabilities have an expected calibration error of 0.013.
+
 **Stack:** Python · pandas · scikit-learn · SHAP · FastAPI · MLflow · Docker · Streamlit
 
 **[Try the live decision app](https://dbechrakis-hotel-cancellation.streamlit.app/)** · [Scoring API](#scoring-api) · [Experiment tracking](docs/experiment-tracking.md) · [Calibration](docs/calibration.md) · [Inspect the holdout evidence](VALIDATION.md) · [Read the design choices](docs/architecture.md#design-decisions)
@@ -275,7 +277,7 @@ See [VALIDATION.md](VALIDATION.md) and [architecture contracts](docs/architectur
 
 Applied machine-learning portfolio project by **Dimitris Bechrakis**, MSc Data Science at **The American College of Greece**. The historical office documents and older `figures/` directory are retained as archived project material. The notebook, artifacts, tests, and `outputs/` are the current evidence.
 
-Business Analyst | Commercial Analytics · Data Products · Applied Data Science
+Business Analyst · Commercial Analytics & Experimentation · Applied Data Science
 
 ## Licensing
 
