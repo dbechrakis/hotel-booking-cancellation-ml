@@ -75,7 +75,7 @@ Which inputs carry the ranking was checked once by refitting the deployed Logist
 | `country` | 0.7432 | 0.6224 |
 | `lead_time` | 0.7645 | 0.6336 |
 
-`country` matters most for ranking. `deposit_type` costs little AUC, but it costs 0.036 of average precision because non-refundable bookings cancel almost always (99.2% in training). That is a known property of this dataset and the reason the score distribution shifts after the threshold window, as described under [Monitoring](#monitoring).
+`country` matters most for ranking, which needs a caution. In this dataset the guest's country is often only confirmed at check-in, so a booking that cancels can keep the hotel's default country (Portugal). Portuguese bookings cancel at 56.6% against 23.6% for the rest, and they are 62% of all cancellations. That pattern fits leakage of the outcome into `country`, though domestic guests may also simply cancel more, and the data cannot separate the two. Without `country` the model still reaches ROC-AUC 0.743, so that is the safer reading of its ranking power. `deposit_type` costs little AUC, but it costs 0.036 of average precision because non-refundable bookings cancel almost always (99.2% in training). That is a known property of this dataset and the reason the score distribution shifts after the threshold window, as described under [Monitoring](#monitoring).
 
 ### Tracked model comparison
 
@@ -265,6 +265,7 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 ## Model interpretation and limitations
 
 - Logistic contributions explain the score mechanically. They are not causal effects.
+- `country` may carry information recorded after booking (see the input-removal check above). A production version should use the country known at booking time.
 - The risk score is a ranking tool, not a guarantee for an individual booking.
 - The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones. A shift in the cancellation base rate would require recalibration.
 - The threshold simulator reuses one historical holdout for scenario exploration. It is not a second independent validation.
