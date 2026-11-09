@@ -22,31 +22,37 @@ high-risk bookings cancel more (the model already ranks that).
 
 ## How large must the test be?
 
-On the later-period holdout, 11,238 of 23,989 bookings clear the 0.372
-risk-score threshold and **49.31%** of them cancelled (the holdout precision). That is the
-control-arm baseline. Over the 33 weeks of holdout booking dates this is about
-**341 flagged bookings per week** across both hotels.
+The baseline should come from the regime the test would run in. On the 16,835
+later bookings (after the window where the threshold and calibrator were set),
+7,548 clear the 0.372 risk-score threshold and **45.28%** of them cancelled. That
+is the control-arm baseline. Over the 29 weeks of those booking dates this is
+about **259 flagged bookings per week** across both hotels.
+
+An earlier version of this page used all 23,989 holdout bookings (49.31%, 341 a
+week). That pooled in the threshold window, whose cancellation rate was higher
+(37% against 29%) because non-refundable bookings later almost disappeared (see
+the README's monitoring section). It understated the test's length by about half.
 
 Sample sizes from `experiment_sample_size()` in
 [`decision.py`](../src/hotel_cancellation/decision.py):
 
 | Relative reduction to detect | Per arm | Total | Approx. weeks of flagged volume |
 |---:|---:|---:|---:|
-| 30% (49.3% → 34.5%) | 174 | 348 | 1 |
-| 20% (49.3% → 39.4%) | 398 | 796 | 2.3 |
-| 15% (49.3% → 41.9%) | 711 | 1,422 | 4.2 |
-| 10% (49.3% → 44.4%) | 1,607 | 3,214 | 9.4 |
-| 5% (49.3% → 46.8%) | 6,447 | 12,894 | 38 |
+| 30% (45.3% → 31.7%) | 201 | 402 | 1.6 |
+| 20% (45.3% → 36.2%) | 461 | 922 | 3.6 |
+| 15% (45.3% → 38.5%) | 828 | 1,656 | 6.4 |
+| 10% (45.3% → 40.8%) | 1,876 | 3,752 | 14.5 |
+| 5% (45.3% → 43.0%) | 7,551 | 15,102 | 58 |
 
 ```python
 from hotel_cancellation.decision import experiment_sample_size
 
-experiment_sample_size(baseline_cancellation_rate=0.4931, relative_reduction=0.10)
-# 1607 bookings per arm
+experiment_sample_size(baseline_cancellation_rate=0.4528, relative_reduction=0.10)
+# 1876 bookings per arm
 ```
 
 A realistic retention contact is more likely to move cancellations by single
-digits than by 30%, so a hotel should plan for a test of roughly two months
+digits than by 30%, so a hotel should plan for a test of three to four months
 rather than a one-week pilot. Outcomes also arrive only after the stay date,
 so the readout lags enrolment by the typical lead time.
 
