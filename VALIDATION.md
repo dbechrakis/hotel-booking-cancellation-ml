@@ -88,3 +88,8 @@ Written before any rolling cutoff was scored. The single chronological split of 
 - **Reported per cutoff:** average precision and ROC-AUC on the whole test window, and on the evaluation 70% the Brier score and ECE of the calibrated probability, the flagged share, recall and precision at the threshold, and the cancellation rate of the calibration and evaluation parts.
 - **What counts as a finding:** the README states the range of each metric across the four cutoffs and whether the single-split values (average precision 0.6224, ECE 0.025, recall 66.3%) sit inside it. Recall below 80% at the evaluation window in a cutoff is reported as such. Nothing is retuned after the run.
 - **Not claimed:** independence between cutoffs. Their training windows nest and their test windows overlap for the three earlier ones, so four numbers are not four independent draws.
+
+### Result of the rolling backtest (same day)
+
+`scripts/rolling_backtest.py` ran once as designed (`outputs/rolling_backtest.csv`). Average precision 0.571 to 0.735, ROC-AUC 0.670 to 0.788, ECE 0.026 to 0.060, recall at the threshold 66.0% to 90.3%, precision 44.5% to 48.5%. The recall target was met at two of four cutoffs (2016-07-12 and 2016-10-12) and missed at the other two, the last cutoff being the lowest. The single-split values are inside every range except ECE, where 0.025 is just below the smallest. The README states the ranges and says the earlier reading of the recall shortfall as a general property of the rule is not supported. Four cutoffs overlap and are not independent draws.
+

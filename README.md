@@ -130,6 +130,22 @@ The threshold rule is "catch 80% of cancellations". It produced a risk-score cut
 
 The design reduces obvious temporal and outcome leakage. It does not prove stability across future seasons, new hotels, or changed operating policies.
 
+### Rolling backtest
+
+The single split above is one draw. [`scripts/rolling_backtest.py`](scripts/rolling_backtest.py) scores the deployed pipeline at four cutoffs three months apart, each trained on matured bookings before it and tested on the bookings made in the next six months. As in the deployed system, the earliest 30% of the test window sets the calibrator and the 80%-recall threshold, and the other 70% evaluates. The design was written in [`VALIDATION.md`](VALIDATION.md) before the run.
+
+| Cutoff | Training rows | Test bookings | Average precision | ROC-AUC | ECE | Flagged | Recall at threshold | Precision |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2016-04-12 | 34,225 | 23,412 | 0.571 | 0.670 | 0.050 | 56% | 70.6% | 44.5% |
+| 2016-07-12 | 50,138 | 28,015 | 0.709 | 0.755 | 0.060 | 72% | 90.3% | 47.4% |
+| 2016-10-12 | 65,742 | 31,627 | 0.735 | 0.788 | 0.046 | 63% | 85.5% | 48.5% |
+| 2017-01-12 | 79,590 | 22,509 | 0.634 | 0.747 | 0.026 | 44% | 66.0% | 45.0% |
+
+- **Ranking moves a lot.** Average precision runs 0.571 to 0.735 and ROC-AUC 0.670 to 0.788 across the four cutoffs. The single-split values (0.622 and 0.743) sit inside both ranges.
+- **The recall target is met in some cutoffs and missed in others.** Recall at the 80%-recall threshold runs 66.0% to 90.3%. It is above 80% at two of the four cutoffs and below at two, and the 2017-01-12 cutoff, which this page reported as the shortfall, is the lowest. So the shortfall is a feature of the last window and not a constant property of the rule. A fixed threshold still needs monitoring.
+- **Calibration error is small throughout.** ECE runs 0.026 to 0.060 and the single-split 0.025 sits at its lower edge. The 2017-01-12 row differs slightly from the single split above because its test window is the six months from the cutoff and not every later booking.
+- Four cutoffs are not four independent draws. Their training windows nest and the test windows of the three earlier ones overlap. Results: [`outputs/rolling_backtest.csv`](outputs/rolling_backtest.csv).
+
 ## Decision economics
 
 For one booking, the application calculates:
@@ -285,7 +301,7 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 - The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones. A shift in the cancellation base rate would require recalibration.
 - The threshold simulator reuses one historical holdout for scenario exploration. It is not a second independent validation.
 - Intervention effectiveness, guest response, margin recovery, and contact cost are not observed in the dataset.
-- Before operational use, the system would require repeated temporal backtesting, calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
+- Before operational use, the system would require calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
 
 See [VALIDATION.md](VALIDATION.md) and [architecture contracts](docs/architecture.md) for the exact verification boundary.
 
