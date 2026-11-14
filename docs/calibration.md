@@ -2,7 +2,7 @@
 
 The deployed logistic model is trained with `class_weight="balanced"` to favour recall.
 The side effect is that its output overstates cancellation rates. On later bookings the
-raw score averages **36%** while **29%** actually cancelled. Ranking is unaffected.
+raw score averages **41%** while **29%** actually cancelled. Ranking is unaffected.
 Expected intervention value, however, multiplies a probability by money, and the risk bands
 describe likelihood, so both need a calibrated number.
 
@@ -32,31 +32,31 @@ once the bookings' stays had passed, so a real calibrator would lag by the typic
 
 | | Brier | Log loss | ECE (10 bins) | Mean predicted | Observed |
 |---|---:|---:|---:|---:|---:|
-| Raw risk score | 0.182 | 0.536 | 0.073 | 36.4% | 29.2% |
-| **Isotonic probability** | **0.174** | **0.517** | **0.013** | **28.8%** | 29.2% |
+| Raw risk score | 0.199 | 0.580 | 0.119 | 41.1% | 29.2% |
+| **Isotonic probability** | **0.184** | **0.549** | **0.025** | **27.9%** | 29.2% |
 
 ![Reliability diagram](../outputs/calibration_reliability.png)
 
 Bin-level values are in [`outputs/calibration_reliability.csv`](../outputs/calibration_reliability.csv).
-Platt scaling on the same split reached a Brier score of 0.175 and an ECE of 0.032, so isotonic
-was kept.
+Platt scaling on the same split reached a Brier score of 0.183 and an ECE of 0.030, so on Brier the two
+tie and isotonic has the lower ECE, which is why it was kept.
 
-**What changes for a user:** for the app's default booking, the risk score is 0.78 but the
-calibrated probability is 56%. With the default assumptions (margin 100, cost 5, success
-25%), the expected intervention value is 8.95. On the raw score it would have been about
-14.5, overstating the value of every contact.
+**What changes for a user:** for the app's default booking, the risk score is 0.56 but the
+calibrated probability is 45%. With the default assumptions (margin 100, cost 5, success
+25%), the expected intervention value is 6.25. On the raw score it would have been about
+9.0, overstating the value of every contact.
 
 ## The review threshold drifts
 
 Rule: the highest risk-score threshold that catches **80%** of cancellations in the
-calibration window. The result is **0.372**.
+calibration window. The result is **0.469**.
 
 | Window | Cancellation rate | Flagged | Recall | Precision |
 |---|---:|---:|---:|---:|
 | Calibration (7,154, chosen here) | 37.1% | — | 80% by construction | — |
-| **Evaluation (16,835)** | 29.2% | 44.8% | **69.6%** | **45.3%** |
+| **Evaluation (16,835)** | 29.2% | 45.1% | **66.3%** | **42.9%** |
 
-The threshold kept its precision, but recall on later bookings fell 10 points short of the
+The threshold kept its precision, but recall on later bookings fell 14 points short of the
 target. The cancellation rate dropped and the mix of cancelling bookings changed. A fixed
 threshold is therefore a monitoring obligation, not a one-off setting.
 
@@ -76,3 +76,7 @@ Removing the feature fixed all three. Raw-score Brier fell to 0.182, a calibrato
 inside the training period now transfers reasonably (ECE 0.076), and Ridge's R² became
 +0.06. Ranking improved slightly (AP 0.644 → 0.646). Forward recalibration still calibrates
 best (ECE 0.013), so it is what the system serves.
+
+## History: the country input
+
+Everything above is the model without `country`, which is the deployed one since 14 November 2026. With `country` the same protocol gave a threshold of 0.372, a raw score averaging 36%, an ECE of 0.013 after calibration, and 69.6% recall at 45.3% precision on the evaluation bookings. The reason for the change and the full comparison are in the README under "Why country was removed".

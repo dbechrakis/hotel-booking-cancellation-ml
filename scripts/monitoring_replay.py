@@ -20,8 +20,12 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from hotel_cancellation.monitoring import PSI_ALERT, PSI_WARN, drift_status, population_stability_index  # noqa: E402
-
+from hotel_cancellation.monitoring import (  # noqa: E402
+    PSI_ALERT,
+    PSI_WARN,
+    drift_status,
+    population_stability_index,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "outputs" / "monitoring"

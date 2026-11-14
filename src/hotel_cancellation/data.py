@@ -1,7 +1,7 @@
 """Chronological split and feature preparation."""
 
-from dataclasses import dataclass
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -63,9 +63,36 @@ def chronological_split(frame: pd.DataFrame, quantile: float = 0.8) -> TemporalS
     return TemporalSplit(cutoff, train_mask, test_mask, purged_mask, booking_date)
 
 
-def feature_target(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+def feature_target(frame: pd.DataFrame, features=FEATURES) -> tuple[pd.DataFrame, pd.Series]:
     """Return the explicit pre-outcome feature contract and binary target."""
-    missing = set(FEATURES + [TARGET]) - set(frame.columns)
+    features = list(features)
+    missing = set(features + [TARGET]) - set(frame.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
-    return frame[FEATURES].copy(), frame[TARGET].astype(int).copy()
+    return frame[features].copy(), frame[TARGET].astype(int).copy()
+
+
+def split_at(frame: pd.DataFrame, cutoff, test_months: int = 6) -> TemporalSplit:
+    """Chronological split at a given cutoff. Training rows are matured before it, the test window is the bookings made in the
+    ``test_months`` months from it, and everything else is purged."""
+    cutoff = pd.Timestamp(cutoff)
+    arrival = pd.to_datetime(
+        frame["arrival_date_year"].astype(str)
+        + "-"
+        + frame["arrival_date_month"]
+        + "-"
+        + frame["arrival_date_day_of_month"].astype(str),
+        format="%Y-%B-%d",
+    )
+    booking_date = arrival - pd.to_timedelta(frame["lead_time"], unit="D")
+    resolved = pd.to_datetime(frame["reservation_status_date"])
+    scheduled_departure = arrival + pd.to_timedelta(
+        frame["stays_in_weekend_nights"] + frame["stays_in_week_nights"],
+        unit="D",
+    )
+    train_mask = (booking_date < cutoff) & (scheduled_departure < cutoff) & (resolved < cutoff)
+    test_mask = (booking_date >= cutoff) & (booking_date < cutoff + pd.DateOffset(months=test_months))
+    purged_mask = ~train_mask & ~test_mask
+    if not train_mask.any() or not test_mask.any() or (train_mask & test_mask).any():
+        raise ValueError("Invalid chronological split")
+    return TemporalSplit(cutoff, train_mask, test_mask, purged_mask, booking_date)

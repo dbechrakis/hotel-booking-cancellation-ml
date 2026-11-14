@@ -1,13 +1,19 @@
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from deploy_huggingface import (  # noqa: E402
-    INCLUDE, SPACE_README, check_health, expected_health, space_host, stage_files, wait_until_running,
+    INCLUDE,
+    SPACE_README,
+    check_health,
+    expected_health,
+    space_host,
+    stage_files,
+    wait_until_running,
 )
 
 

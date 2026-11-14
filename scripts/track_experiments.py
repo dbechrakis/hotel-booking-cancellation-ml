@@ -10,17 +10,17 @@ reports performance and never chooses the model.
     mlflow ui --backend-store-uri sqlite:///mlflow.db
 """
 
-from pathlib import Path
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
-from mlflow.models import infer_signature
 import numpy as np
 import pandas as pd
 import sklearn
+from mlflow.models import infer_signature
 from sklearn.base import clone
 from sklearn.calibration import calibration_curve
 from sklearn.dummy import DummyClassifier
@@ -36,10 +36,13 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
-from hotel_cancellation.contracts import FEATURES
+from hotel_cancellation.contracts import (
+    NOTEBOOK_CATEGORICAL_FEATURES,
+    NOTEBOOK_FEATURES,
+    NUMERIC_FEATURES,
+)
 from hotel_cancellation.data import chronological_split, feature_target, source_sha256
 from hotel_cancellation.model import build_pipeline
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "data" / "raw" / "hotel_bookings.csv"
@@ -60,14 +63,14 @@ SKOPS_TRUSTED_TYPES = [
 
 def candidate(estimator) -> Pipeline:
     """Reuse the deployed preprocessing so candidates differ only in the estimator."""
-    pipeline = build_pipeline()
+    pipeline = build_pipeline(NUMERIC_FEATURES, NOTEBOOK_CATEGORICAL_FEATURES)
     pipeline.steps[-1] = ("model", estimator)
     return pipeline
 
 
 CANDIDATES = {
     "Prior baseline": candidate(DummyClassifier(strategy="prior")),
-    "Logistic Regression": build_pipeline(),
+    "Logistic Regression": build_pipeline(NUMERIC_FEATURES, NOTEBOOK_CATEGORICAL_FEATURES),
     "Random Forest": candidate(
         RandomForestClassifier(
             n_estimators=200,
@@ -129,12 +132,12 @@ def main() -> None:
         raise ValueError("Source fingerprint does not match the validated dataset")
 
     raw = pd.read_csv(SOURCE)
-    features, target = feature_target(raw)
+    features, target = feature_target(raw, NOTEBOOK_FEATURES)
     outer = chronological_split(raw)
     # The inner split applies the same matured-label contract inside the training period.
     training_period = raw.loc[outer.train_mask].reset_index(drop=True)
     inner = chronological_split(training_period)
-    inner_features, inner_target = feature_target(training_period)
+    inner_features, inner_target = feature_target(training_period, NOTEBOOK_FEATURES)
 
     mlflow.set_tracking_uri(
         os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{ROOT / 'mlflow.db'}")
@@ -160,7 +163,7 @@ def main() -> None:
                 "validation_rows": int(inner.test_mask.sum()),
                 "train_rows": int(outer.train_mask.sum()),
                 "holdout_rows": int(outer.test_mask.sum()),
-                "n_features": len(FEATURES),
+                "n_features": len(NOTEBOOK_FEATURES),
             }
         )
         for name, template in CANDIDATES.items():

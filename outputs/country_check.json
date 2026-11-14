@@ -1,0 +1,35 @@
+{
+  "with_country": {
+    "roc_auc": 0.7752891932242225,
+    "average_precision": 0.6457312950879776,
+    "calibration_evaluation": {
+      "brier": 0.17376123753467762,
+      "log_loss": 0.5174727030855879,
+      "ece": 0.012825018897138683,
+      "mean_predicted": 0.2878527087253138,
+      "observed_rate": 0.2915354915354915
+    },
+    "threshold": 0.3720821779719931,
+    "evaluation_flagged_share": 0.44835164835164837,
+    "evaluation_recall": 0.6964140179299103,
+    "evaluation_precision": 0.4528351881293058,
+    "evaluation_rows": 16835
+  },
+  "without_country": {
+    "roc_auc": 0.7431630658743832,
+    "average_precision": 0.6224161797395082,
+    "calibration_evaluation": {
+      "brier": 0.1835411622878166,
+      "log_loss": 0.5493355425938243,
+      "ece": 0.02516802661906124,
+      "mean_predicted": 0.2792229798699455,
+      "observed_rate": 0.2915354915354915
+    },
+    "threshold": 0.46872388431538203,
+    "evaluation_flagged_share": 0.4507870507870508,
+    "evaluation_recall": 0.66320293398533,
+    "evaluation_precision": 0.42891026485702993,
+    "evaluation_rows": 16835
+  },
+  "portugal_share_of_cancellations_later": 0.42428250231450865
+}

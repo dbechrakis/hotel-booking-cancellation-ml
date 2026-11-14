@@ -5,17 +5,17 @@ hash-verified artifact as the Streamlit app and applies the same booking validat
 risk bands and decision rules, so an API score and an app score never diverge.
 """
 
-from contextlib import asynccontextmanager
 import json
 import logging
 import os
-from pathlib import Path
 import time
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 
+import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
-import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from hotel_cancellation import __version__
@@ -27,7 +27,6 @@ from hotel_cancellation.decision import (
 )
 from hotel_cancellation.model import load_model_bundle, local_contributions
 from hotel_cancellation.monitoring import ScoreMonitor
-
 
 ARTIFACT_DIR = Path(
     os.environ.get(
@@ -73,7 +72,6 @@ class Booking(BaseModel):
                 "children": 0,
                 "babies": 0,
                 "meal": "BB",
-                "country": "PRT",
                 "market_segment": "Online TA",
                 "distribution_channel": "TA/TO",
                 "is_repeated_guest": 0,
@@ -98,7 +96,6 @@ class Booking(BaseModel):
     children: int = Field(ge=0, le=10)
     babies: int = Field(ge=0, le=10)
     meal: str
-    country: str
     market_segment: str
     distribution_channel: str
     is_repeated_guest: Literal[0, 1]

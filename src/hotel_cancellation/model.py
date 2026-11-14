@@ -1,9 +1,9 @@
 """Model construction, prediction, and local contribution utilities."""
 
-from dataclasses import dataclass
-from pathlib import Path
 import hashlib
 import json
+from dataclasses import dataclass
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -16,8 +16,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES
-
+from hotel_cancellation.contracts import (
+    CATEGORICAL_FEATURES,
+    FEATURES,
+    NUMERIC_FEATURES,
+)
 
 MODEL_FILE = "cancellation_logistic.joblib"
 CALIBRATOR_FILE = "cancellation_calibrator.joblib"
@@ -27,8 +30,11 @@ class ModelVersionError(ValueError):
     """Raised when the installed scikit-learn differs from the one that exported the artifact."""
 
 
-def build_pipeline() -> Pipeline:
-    """Build the exact compact classification pipeline used for deployment."""
+def build_pipeline(numeric=NUMERIC_FEATURES, categorical=CATEGORICAL_FEATURES) -> Pipeline:
+    """Build the exact compact classification pipeline used for deployment.
+
+    The two arguments default to the deployed feature contract. They exist so that an input can be
+    left out for a comparison, as ``scripts/country_check.py`` does."""
     preprocessor = ColumnTransformer(
         [
             (
@@ -39,7 +45,7 @@ def build_pipeline() -> Pipeline:
                         ("scale", StandardScaler()),
                     ]
                 ),
-                NUMERIC_FEATURES,
+                list(numeric),
             ),
             (
                 "cat",
@@ -52,7 +58,7 @@ def build_pipeline() -> Pipeline:
                         ),
                     ]
                 ),
-                CATEGORICAL_FEATURES,
+                list(categorical),
             ),
         ]
     )
