@@ -9,4 +9,4 @@ nbformat==5.11.1
 jupyter_client==8.10.0
 ipykernel==7.3.0
 joblib==1.5.3
-streamlit==1.45.1
+streamlit==1.54.0
