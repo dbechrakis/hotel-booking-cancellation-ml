@@ -104,3 +104,8 @@ Written before the rule below was scored. The README says the action on an alert
 - **Compared.** The same weeks with the deployed threshold and with the rule: realised recall and precision by week, the mean of each over the weeks, the weeks below 80% recall, the flagged share, the number of re-sets and skips and the thresholds chosen.
 - **What counts as a finding:** the README states the realised recall with and without the rule over the same 27 weeks. If the rule does not raise recall, that is reported as the result. Nothing is retuned after the run.
 - **Limits:** one replay on one holdout, with a threshold chosen from the same period it then serves. The pool lags by the length of stay, so the rule acts later than the alert.
+
+### Result of the action replay (same day)
+
+`scripts/action_replay.py` ran once as designed (`outputs/monitoring/action_replay.json`). The rule re-set the threshold 6 times and skipped 2. Mean weekly recall 65.4% with the deployed threshold, 86.7% with the rule. Weeks below 80%: 27 against 7. Mean flagged share 44.2% against 72.9% and mean precision 42.0% against 34.4%. The recovery comes from flagging many more bookings. The first re-set (2017-02-27, threshold 0.211) put recall above 90% for six weeks because the pool of ended stays is short stays. The README reports the recovery and its cost. No setting was changed after the run. Leakage tests: the re-set threshold cannot depend on the outcome or the score of a booking whose stay has not ended.
+
