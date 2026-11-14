@@ -93,3 +93,14 @@ Written before any rolling cutoff was scored. The single chronological split of 
 
 `scripts/rolling_backtest.py` ran once as designed (`outputs/rolling_backtest.csv`). Average precision 0.571 to 0.735, ROC-AUC 0.670 to 0.788, ECE 0.026 to 0.060, recall at the threshold 66.0% to 90.3%, precision 44.5% to 48.5%. The recall target was met at two of four cutoffs (2016-07-12 and 2016-10-12) and missed at the other two, the last cutoff being the lowest. The single-split values are inside every range except ECE, where 0.025 is just below the smallest. The README states the ranges and says the earlier reading of the recall shortfall as a general property of the rule is not supported. Four cutoffs overlap and are not independent draws.
 
+
+## Replay of the stated monitoring action, design fixed before it was run — 2026-11-14
+
+Written before the rule below was scored. The README says the action on an alert is to re-set the threshold on recent matured outcomes and not to retrain. This replay tests whether that action would have recovered recall on the 27 evaluation weeks.
+
+- **Trigger.** At the end of a week, if the rolling PSI status (trailing 2,000 scores, as `scripts/monitoring_replay.py`) is `alert` in that week and in the week before. No re-set within four weeks of the previous one.
+- **Action.** The new threshold is the highest risk score reaching 80% recall among the latest 2,000 bookings, by booking date, whose scheduled stay had ended before the week's end. Only out-of-sample holdout scores are used. The pool needs at least 300 cancellations, otherwise the re-set is skipped and reported as skipped. The model, the calibrator and every other setting stay as deployed.
+- **Maturity.** An outcome counts as known once the scheduled departure date has passed, as the README says outcomes arrive. A booking's cancellation date is not used, because cancellations are visible earlier than completed stays and that would bias the pool.
+- **Compared.** The same weeks with the deployed threshold and with the rule: realised recall and precision by week, the mean of each over the weeks, the weeks below 80% recall, the flagged share, the number of re-sets and skips and the thresholds chosen.
+- **What counts as a finding:** the README states the realised recall with and without the rule over the same 27 weeks. If the rule does not raise recall, that is reported as the result. Nothing is retuned after the run.
+- **Limits:** one replay on one holdout, with a threshold chosen from the same period it then serves. The pool lags by the length of stay, so the rule acts later than the alert.
