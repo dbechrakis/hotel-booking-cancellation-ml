@@ -75,3 +75,16 @@ The app is a portfolio decision-support demonstration. No intervention success o
 - The API, the app, the example booking and the docs lost the field. A request that carries `country` is rejected (422). `make check` passes (38 tests, evidence check, lint).
 - Not rerun: the MLflow tracking, the notebook, the Hugging Face deployment. The hosted app needs a redeploy to use the new artifacts.
 
+
+## Rolling temporal backtest, design fixed before it was run — 2026-11-14
+
+Written before any rolling cutoff was scored. The single chronological split of the README is one draw. This section fixes how a repeated backtest will be read.
+
+- **Cutoffs.** 2016-04-12, 2016-07-12, 2016-10-12 and 2017-01-12 (the committed split's cutoff). Counts only, taken first: the later six months hold 23,412, 28,015, 31,627 and 22,509 bookings, so all four clear the 5,000 floor.
+- **Training rows** at a cutoff: the committed rule. Booking date, scheduled departure and resolution date all before the cutoff.
+- **Test window** at a cutoff: bookings made in the six months from the cutoff. Later bookings are purged.
+- **Model:** the deployed logistic pipeline, unchanged, without `country`. No refit of any setting.
+- **Calibration and threshold:** as the deployed system. The earliest 30% of the test window by booking date sets the isotonic calibrator and the 80%-recall threshold, and the other 70% evaluates.
+- **Reported per cutoff:** average precision and ROC-AUC on the whole test window, and on the evaluation 70% the Brier score and ECE of the calibrated probability, the flagged share, recall and precision at the threshold, and the cancellation rate of the calibration and evaluation parts.
+- **What counts as a finding:** the README states the range of each metric across the four cutoffs and whether the single-split values (average precision 0.6224, ECE 0.025, recall 66.3%) sit inside it. Recall below 80% at the evaluation window in a cutoff is reported as such. Nothing is retuned after the run.
+- **Not claimed:** independence between cutoffs. Their training windows nest and their test windows overlap for the three earlier ones, so four numbers are not four independent draws.
