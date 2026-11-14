@@ -1,6 +1,6 @@
-from pathlib import Path
 import os
 import unittest
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,6 @@ from hotel_cancellation.model import (
     load_model_bundle,
     local_contributions,
 )
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

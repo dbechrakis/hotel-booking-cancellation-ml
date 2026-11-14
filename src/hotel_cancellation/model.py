@@ -1,9 +1,9 @@
 """Model construction, prediction, and local contribution utilities."""
 
-from dataclasses import dataclass
-from pathlib import Path
 import hashlib
 import json
+from dataclasses import dataclass
+from pathlib import Path
 
 import joblib
 import numpy as np
@@ -16,8 +16,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES
-
+from hotel_cancellation.contracts import (
+    CATEGORICAL_FEATURES,
+    FEATURES,
+    NUMERIC_FEATURES,
+)
 
 MODEL_FILE = "cancellation_logistic.joblib"
 CALIBRATOR_FILE = "cancellation_calibrator.joblib"

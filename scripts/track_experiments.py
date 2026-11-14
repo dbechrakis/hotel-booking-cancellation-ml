@@ -10,17 +10,17 @@ reports performance and never chooses the model.
     mlflow ui --backend-store-uri sqlite:///mlflow.db
 """
 
-from pathlib import Path
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import mlflow
 import mlflow.sklearn
-from mlflow.models import infer_signature
 import numpy as np
 import pandas as pd
 import sklearn
+from mlflow.models import infer_signature
 from sklearn.base import clone
 from sklearn.calibration import calibration_curve
 from sklearn.dummy import DummyClassifier
@@ -36,10 +36,13 @@ from sklearn.metrics import (
 )
 from sklearn.pipeline import Pipeline
 
-from hotel_cancellation.contracts import NOTEBOOK_CATEGORICAL_FEATURES, NOTEBOOK_FEATURES, NUMERIC_FEATURES
+from hotel_cancellation.contracts import (
+    NOTEBOOK_CATEGORICAL_FEATURES,
+    NOTEBOOK_FEATURES,
+    NUMERIC_FEATURES,
+)
 from hotel_cancellation.data import chronological_split, feature_target, source_sha256
 from hotel_cancellation.model import build_pipeline
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "data" / "raw" / "hotel_bookings.csv"

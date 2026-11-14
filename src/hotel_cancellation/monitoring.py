@@ -6,11 +6,10 @@ share and the share of unseen categories have moved away from the window the thr
 calibrator were set on. A large shift is the early warning that recall may have moved too.
 """
 
-from collections import deque
 import threading
+from collections import deque
 
 import numpy as np
-
 
 # Conventional population-stability bands.
 PSI_WARN = 0.10

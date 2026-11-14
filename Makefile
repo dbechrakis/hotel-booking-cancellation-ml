@@ -7,7 +7,7 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt -r requirements-dev.txt
 
 lint:
-	$(PYTHON) -m ruff check app.py app src tests scripts --select E4,E7,E9,F
+	$(PYTHON) -m ruff check app.py app src tests scripts
 
 evidence:
 	PYTHONPATH=src $(PYTHON) ci/verify_evidence.py

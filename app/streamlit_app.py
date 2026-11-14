@@ -14,7 +14,6 @@ from hotel_cancellation.decision import (
 )
 from hotel_cancellation.model import load_model_bundle, local_contributions
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

@@ -4,12 +4,17 @@ Each cutoff trains on matured bookings before it and tests on the bookings made 
 system, the earliest 30% of the test window sets the isotonic calibrator and the 80%-recall threshold and the other 70% evaluates.
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 from hotel_cancellation.calibration import calibration_summary
 from hotel_cancellation.data import feature_target, source_sha256, split_at

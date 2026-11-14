@@ -10,11 +10,10 @@ Space to build and start, then checks that /health reports the committed model v
 
 import json
 import os
-from pathlib import Path
 import shutil
 import time
+from pathlib import Path
 from urllib.request import urlopen
-
 
 ROOT = Path(__file__).resolve().parents[1]
 INCLUDE = ["Dockerfile", "requirements-api.txt", "pyproject.toml", "src", "artifacts"]

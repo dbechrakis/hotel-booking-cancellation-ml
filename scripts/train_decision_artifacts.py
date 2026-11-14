@@ -6,8 +6,8 @@ and evaluated on the later 70%, mirroring how a deployed score would be recalibr
 re-thresholded on its most recent matured outcomes. The later 70% is never used to choose.
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import joblib
 import matplotlib
@@ -26,7 +26,10 @@ from sklearn.metrics import (  # noqa: E402
     roc_auc_score,
 )
 
-from hotel_cancellation.calibration import calibration_summary, reliability_table  # noqa: E402
+from hotel_cancellation.calibration import (  # noqa: E402
+    calibration_summary,
+    reliability_table,
+)
 from hotel_cancellation.contracts import (  # noqa: E402
     CATEGORICAL_FEATURES,
     FEATURES,
@@ -35,8 +38,11 @@ from hotel_cancellation.contracts import (  # noqa: E402
     NUMERIC_FEATURES,
     REMOVED_AFTER_REVIEW,
 )
-from hotel_cancellation.data import chronological_split, feature_target, source_sha256  # noqa: E402
-from hotel_cancellation.monitoring import reference_profile  # noqa: E402
+from hotel_cancellation.data import (  # noqa: E402
+    chronological_split,
+    feature_target,
+    source_sha256,
+)
 from hotel_cancellation.model import (  # noqa: E402
     CALIBRATOR_FILE,
     MODEL_FILE,
@@ -44,7 +50,7 @@ from hotel_cancellation.model import (  # noqa: E402
     file_sha256,
     fit_calibrator,
 )
-
+from hotel_cancellation.monitoring import reference_profile  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "data" / "raw" / "hotel_bookings.csv"

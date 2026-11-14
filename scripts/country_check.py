@@ -5,15 +5,24 @@ measures what the ranking, the calibration and the review threshold lose when th
 same rows, the same split, the same calibration window (the earliest 30% of later bookings) and the same recall rule.
 """
 
-from pathlib import Path
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 from hotel_cancellation.calibration import calibration_summary
-from hotel_cancellation.contracts import NOTEBOOK_CATEGORICAL_FEATURES, NOTEBOOK_FEATURES, NUMERIC_FEATURES
+from hotel_cancellation.contracts import (
+    NOTEBOOK_CATEGORICAL_FEATURES,
+    NOTEBOOK_FEATURES,
+    NUMERIC_FEATURES,
+)
 from hotel_cancellation.data import chronological_split, feature_target, source_sha256
 from hotel_cancellation.model import build_pipeline, fit_calibrator
 

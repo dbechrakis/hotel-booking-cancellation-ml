@@ -109,3 +109,8 @@ Written before the rule below was scored. The README says the action on an alert
 
 `scripts/action_replay.py` ran once as designed (`outputs/monitoring/action_replay.json`). The rule re-set the threshold 6 times and skipped 2. Mean weekly recall 65.4% with the deployed threshold, 86.7% with the rule. Weeks below 80%: 27 against 7. Mean flagged share 44.2% against 72.9% and mean precision 42.0% against 34.4%. The recovery comes from flagging many more bookings. The first re-set (2017-02-27, threshold 0.211) put recall above 90% for six weeks because the pool of ended stays is short stays. The README reports the recovery and its cost. No setting was changed after the run. Leakage tests: the re-set threshold cannot depend on the outcome or the score of a booking whose stay has not ended.
 
+
+## Wider lint rules — 2026-11-14
+
+- Ruff now selects the rule families E, F, I, UP, B and SIM, with line length (E501) and zip without strict (B905) ignored, in `pyproject.toml`. The Makefile and the evidence workflow use that configuration. Before this the check selected syntax errors and unused names only.
+- 19 import-sorting findings were fixed automatically. No behaviour changed. The monitoring replay was rerun after the change and its committed outputs are byte-identical, and the 43 tests and the evidence check pass.

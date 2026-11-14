@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
 import os
 import unittest
+from pathlib import Path
 
 import pandas as pd
 
@@ -10,7 +10,7 @@ from hotel_cancellation.model import ModelVersionError, load_model_bundle
 try:
     from fastapi.testclient import TestClient
 
-    from hotel_cancellation.api import Booking, MAX_BATCH_SIZE, app
+    from hotel_cancellation.api import MAX_BATCH_SIZE, Booking, app
 except ImportError as error:  # API extras are optional for the notebook environment.
     if os.environ.get("CI"):
         raise
