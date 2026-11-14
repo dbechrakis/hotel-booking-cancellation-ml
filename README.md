@@ -301,7 +301,7 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 - The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones. A shift in the cancellation base rate would require recalibration.
 - The threshold simulator reuses one historical holdout for scenario exploration. It is not a second independent validation.
 - Intervention effectiveness, guest response, margin recovery, and contact cost are not observed in the dataset.
-- Before operational use, the system would require calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
+- Before operational use, the system would require temporal backtesting on newer data, calibration monitoring, fairness/privacy review, and a controlled intervention experiment ([design and sample sizes](docs/experiment-design.md)).
 
 See [VALIDATION.md](VALIDATION.md) and [architecture contracts](docs/architecture.md) for the exact verification boundary.
 
