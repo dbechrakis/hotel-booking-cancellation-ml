@@ -19,7 +19,7 @@ flowchart TD
 |---|---|
 | Source → training | SHA-256 must match the validated 119,390-row snapshot |
 | Raw data → split | Training booking, stay end, and resolved outcome precede cutoff; test booking is on/after cutoff |
-| Split → model | Explicit 21-feature contract; leakage and mutable outcome-proxy fields excluded, and `arrival_date_year` excluded because it extrapolates |
+| Split → model | Explicit 20-feature contract; leakage and mutable outcome-proxy fields excluded, `arrival_date_year` excluded because it extrapolates, and `country` excluded because it may carry the outcome |
 | Model → artifact | Reproduced holdout metrics must match committed results before export |
 | Artifact → app | Artifact hash, feature order, and exact scikit-learn version are verified |
 | Booking → score | Non-negative ADR, at least one guest, and at least one night |

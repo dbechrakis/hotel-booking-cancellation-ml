@@ -103,9 +103,9 @@ class ApiTests(unittest.TestCase):
             self.assertAlmostEqual(score["cancellation_probability"], float(probability), places=12)
 
     def test_unseen_category_is_reported_not_rejected(self):
-        booking = dict(EXAMPLE, country="ATLANTIS")
+        booking = dict(EXAMPLE, meal="MOON")
         body = self.client.post("/predict", json={"booking": booking}).json()
-        self.assertEqual(body["unseen_categories"], {"country": "ATLANTIS"})
+        self.assertEqual(body["unseen_categories"], {"meal": "MOON"})
 
     def test_invalid_bookings_are_rejected(self):
         invalid = [
@@ -134,7 +134,7 @@ class ApiTests(unittest.TestCase):
             self.client.post("/predict", json={"booking": EXAMPLE, "explain": False})
         record = json.loads(logs.records[-1].getMessage())
         self.assertEqual(record["event"], "booking_scored")
-        self.assertNotIn("country", record)
+        self.assertNotIn("meal", record)
         self.assertIn("risk_score", record)
 
     def test_batch_size_is_bounded(self):

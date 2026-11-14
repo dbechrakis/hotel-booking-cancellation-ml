@@ -43,7 +43,7 @@ with the run manifest in [`run_manifest.json`](../outputs/experiments/run_manife
 | Model | Validation AP | Holdout AP | Holdout ROC AUC | Holdout F1 @0.50 | Holdout Brier |
 |---|---:|---:|---:|---:|---:|
 | Prior baseline | 0.269 | 0.315 | 0.500 | 0.000 | 0.218 |
-| **Logistic Regression** (deployed) | 0.471 | 0.646 | 0.775 | 0.544 | 0.175 |
+| **Logistic Regression** (notebook inputs, with `country`) | 0.471 | 0.646 | 0.775 | 0.544 | 0.175 |
 | **Random Forest** (selected on validation) | **0.502** | 0.680 | 0.808 | 0.569 | 0.163 |
 | Hist Gradient Boosting | 0.449 | **0.690** | **0.817** | **0.618** | **0.161** |
 

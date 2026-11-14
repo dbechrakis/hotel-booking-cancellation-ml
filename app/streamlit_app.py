@@ -37,7 +37,7 @@ def numeric_default(metadata: dict, feature: str) -> float:
 
 
 def booking_form(metadata: dict) -> dict:
-    """Collect the explicit 21-feature booking contract."""
+    """Collect the explicit 20-feature booking contract."""
     with st.expander("Booking and stay", expanded=True):
         left, middle, right = st.columns(3)
         with left:
@@ -91,7 +91,6 @@ def booking_form(metadata: dict) -> dict:
         left, middle, right = st.columns(3)
         with left:
             meal = categorical_input(metadata, "meal", "Meal")
-            country = categorical_input(metadata, "country", "Country")
             market_segment = categorical_input(metadata, "market_segment", "Market segment")
         with middle:
             distribution_channel = categorical_input(
@@ -122,7 +121,6 @@ def booking_form(metadata: dict) -> dict:
         "children": children,
         "babies": babies,
         "meal": meal,
-        "country": country,
         "market_segment": market_segment,
         "distribution_channel": distribution_channel,
         "is_repeated_guest": is_repeated_guest,

@@ -4,7 +4,7 @@
 
 An end-to-end machine-learning decision product that ranks hotel booking cancellation risk, explains individual scores, and translates calibrated probabilities into transparent intervention-policy scenarios.
 
-**Result:** On 16,835 later bookings, the review threshold flags 45% of bookings and catches 70% of cancellations at 45% precision. Calibrated probabilities have an expected calibration error of 0.013.
+**Result:** On 16,835 later bookings, the review threshold flags 45% of bookings and catches 66% of cancellations at 43% precision. Calibrated probabilities have an expected calibration error of 0.025. The deployed model leaves out `country`, which probably carries the outcome (see [Why country was removed](#why-country-was-removed)).
 
 **Stack:** Python · pandas · scikit-learn · SHAP · FastAPI · MLflow · Docker · Streamlit
 
@@ -14,7 +14,7 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 | Question | Evidence | Decision supported | Boundary |
 |---|---|---|---|
-| Which bookings merit a limited retention review? | A logistic model ranks **23,989 later bookings** with **0.646 average precision** (base rate 0.315). A review threshold set for 80% recall on early post-cutoff bookings caught **70% of cancellations at 45% precision** on the 16,835 later ones. Isotonic calibration brings probability calibration error to **0.013**. | Explore a review threshold and contact capacity using the holdout simulator. Prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
+| Which bookings merit a limited retention review? | A logistic model ranks **23,989 later bookings** with **0.622 average precision** (base rate 0.315). A review threshold set for 80% recall on early post-cutoff bookings caught **66% of cancellations at 43% precision** on the 16,835 later ones. Isotonic calibration brings probability calibration error to **0.025**. | Explore a review threshold and contact capacity using the holdout simulator. Prioritize a booking only when its risk clears the threshold **and** assumed expected value is positive. | The intervention success rate and recoverable margin are assumptions. No retention uplift or production outcome has been measured. |
 
 [Read the business analysis case: user need, requirements and acceptance scenarios](docs/business-analysis-case.md).
 
@@ -62,7 +62,7 @@ The analysis uses all 119,390 rows from the public Hotel Booking Demand snapshot
 | Logistic Regression | 0.5435 | 0.5788 | 0.5122 | 0.6457 | 0.7753 |
 | **Random Forest** | **0.5685** | **0.6061** | **0.5354** | **0.6797** | **0.8080** |
 
-These are threshold-free ranking scores plus a fixed 0.50 comparison point. The deployed review threshold is chosen separately (below). Random Forest ranks the holdout better. The deployed artifact uses Logistic Regression because it is compact, directly explainable through signed contributions, and reproduces the committed chronological-holdout metrics.
+These are the notebook's threshold-free ranking scores plus a fixed 0.50 comparison point. **They were run with `country` as an input, which the deployed model no longer uses** (see [Why country was removed](#why-country-was-removed)). The deployed review threshold is chosen separately (below). Random Forest ranks the holdout better. The deployed artifact uses Logistic Regression because it is compact and directly explainable through signed contributions. The training script first reproduces the Logistic Regression row above with `country`, then fits the deployed model without it: average precision 0.6224 and ROC AUC 0.7432.
 
 `arrival_date_year` is not a model input. As a numeric feature it pushed every later booking beyond the training years, which inflated scores by about 14 points. Removing it slightly improved ranking (AP 0.644 → 0.646). It also brought the raw-score Brier score from 0.229 to 0.182, and turned the retrospective lead-time regression from R² −1.83 into +0.06 (Ridge).
 
@@ -75,15 +75,30 @@ Which inputs carry the ranking was checked once by refitting the deployed Logist
 | `country` | 0.7432 | 0.6224 |
 | `lead_time` | 0.7645 | 0.6336 |
 
-`country` matters most for ranking, which needs a caution. In this dataset the guest's country is often only confirmed at check-in, so a booking that cancels can keep the hotel's default country (Portugal). Portuguese bookings cancel at 56.6% against 23.6% for the rest, and they are 62% of all cancellations. That pattern fits leakage of the outcome into `country`, though domestic guests may also simply cancel more, and the data cannot separate the two. Without `country` the model still reaches ROC-AUC 0.743, so that is the safer reading of its ranking power. `deposit_type` costs little AUC, but it costs 0.036 of average precision because non-refundable bookings cancel almost always (99.2% in training). That is a known property of this dataset and the reason the score distribution shifts after the threshold window, as described under [Monitoring](#monitoring).
+### Why country was removed
+
+`country` matters most for ranking, which needs a caution. In this dataset the guest's country is often only confirmed at check-in, so a booking that cancels can keep the hotel's default country (Portugal). Portuguese bookings cancel at 56.6% against 23.6% for the rest, and they are 62% of all cancellations. That pattern fits leakage of the outcome into `country`, though domestic guests may also simply cancel more, and the data cannot separate the two. A booking made today does not have the checked-in country, so a model that leans on it would score worse in service than on this file. The deployed model therefore **leaves `country` out**. The API no longer accepts the field and rejects a request that carries it.
+
+What that costs, on the same split and the same rules for the calibrator and the threshold ([`scripts/country_check.py`](scripts/country_check.py), [`outputs/country_check.json`](outputs/country_check.json)):
+
+| | With `country` | Without `country` (deployed) |
+|---|---:|---:|
+| ROC-AUC, 23,989 later bookings | 0.7753 | 0.7432 |
+| Average precision | 0.6457 | 0.6224 |
+| Calibration error after isotonic (ECE), 16,835 bookings | 0.013 | 0.025 |
+| Brier score after isotonic | 0.174 | 0.184 |
+| Recall at the 80%-recall threshold, 16,835 bookings | 69.6% | 66.3% |
+| Precision at that threshold | 45.3% | 42.9% |
+
+The loss is real and modest, and the lower figures are the ones this page reports. `deposit_type` costs little AUC, but it costs 0.036 of average precision because non-refundable bookings cancel almost always (99.2% in training). That is a known property of this dataset and the reason the score distribution shifts after the threshold window, as described under [Monitoring](#monitoring).
 
 ### Tracked model comparison
 
-[`scripts/track_experiments.py`](scripts/track_experiments.py) reruns the comparison under MLflow with a gradient-boosting candidate added. It selects on an inner chronological validation window inside the training period, then scores every candidate once on the holdout. It also records calibration (Brier score) and registers the deployed pipeline as `hotel-cancellation-risk@production`.
+[`scripts/track_experiments.py`](scripts/track_experiments.py) reruns the comparison under MLflow with a gradient-boosting candidate added. It keeps the notebook's inputs, including `country`, so it stays comparable with the notebook table, and it is recorded history of how the model was chosen, not the deployed model's scores. It selects on an inner chronological validation window inside the training period, then scores every candidate once on the holdout. It also records calibration (Brier score) and registers the deployed pipeline as `hotel-cancellation-risk@production`.
 
 | Model | Validation AP (selects) | Holdout AP | Holdout Brier |
 |---|---:|---:|---:|
-| Logistic Regression (deployed, raw score) | 0.471 | 0.646 | 0.175 |
+| Logistic Regression (notebook inputs, raw score) | 0.471 | 0.646 | 0.175 |
 | Random Forest (selected) | **0.502** | 0.680 | 0.163 |
 | Hist Gradient Boosting | 0.449 | **0.690** | **0.161** |
 
@@ -91,14 +106,14 @@ Validation and holdout disagree on the best tree model, so the holdout winner is
 
 ### Calibrated probabilities and the review threshold
 
-The class-weighted score averages 36% on later bookings while 29% cancel. Expected intervention value multiplies a probability by money, so it needs calibration. The system serves the raw **risk score** for ranking and the review threshold, and an **isotonic-calibrated probability** for risk bands and economics. The calibrator and the threshold were chosen on the earliest 30% of later bookings and evaluated on the other 16,835:
+The class-weighted score averages 41% on later bookings while 29% cancel. Expected intervention value multiplies a probability by money, so it needs calibration. The system serves the raw **risk score** for ranking and the review threshold, and an **isotonic-calibrated probability** for risk bands and economics. The calibrator and the threshold were chosen on the earliest 30% of later bookings and evaluated on the other 16,835:
 
 | | Brier | ECE | Mean predicted vs observed |
 |---|---:|---:|---:|
-| Raw risk score | 0.182 | 0.073 | 36.4% vs 29.2% |
-| **Isotonic probability** | **0.174** | **0.013** | **28.8% vs 29.2%** |
+| Raw risk score | 0.199 | 0.119 | 41.1% vs 29.2% |
+| **Isotonic probability** | **0.184** | **0.025** | **27.9% vs 29.2%** |
 
-The threshold rule is "catch 80% of cancellations". It produced a risk-score cut of 0.372. On the later bookings that cut flagged 45% of bookings and caught **70%** of cancellations at **45%** precision, short of the 80% target. The cancellation rate fell from 37% to 29% between the two windows, so a fixed threshold drifts and needs monitoring (see [Monitoring](#monitoring)). [Protocol, reliability diagram and history](docs/calibration.md).
+The threshold rule is "catch 80% of cancellations". It produced a risk-score cut of 0.469. On the later bookings that cut flagged 45% of bookings and caught **66%** of cancellations at **43%** precision, short of the 80% target. The cancellation rate fell from 37% to 29% between the two windows, so a fixed threshold drifts and needs monitoring (see [Monitoring](#monitoring)). [Protocol, reliability diagram and history](docs/calibration.md).
 
 [Classification metrics](outputs/classification_metrics.csv) · [Compressed holdout scores and probabilities](outputs/holdout_predictions.csv.gz) · [Split manifest](outputs/validation.json)
 
@@ -255,9 +270,9 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 
 ![Weekly monitoring replay](outputs/monitoring/weekly_replay.png)
 
-- **The monitor would have alerted in the third week (2017-02-20) and stayed at warn or alert every week after, months before outcomes confirmed the shortfall.** Realised recall stayed below the 80% target in 26 of 27 weeks. Rolling PSI and weekly recall correlate at −0.62.
+- **The monitor would have alerted in the third week (2017-02-20) and stayed at warn or alert every week after, months before outcomes confirmed the shortfall.** Realised recall stayed below the 80% target in 27 of 27 weeks. Rolling PSI and weekly recall correlate at −0.23.
 - **The cause is visible in the scores.** Non-refundable bookings were 13.1% of the threshold window but 1.4% afterwards. These are near-certain cancellations (risk score ≥ 0.99) that had made 80% recall easy to reach. Once they disappear the top score decile empties, PSI jumps, and the remaining cancellations are harder to catch.
-- **Calibration held up better than the threshold.** The weekly mean calibrated probability stayed within 2.4 points of the observed cancellation rate on average. Action on an alert is to re-set the threshold on recent matured outcomes, not to retrain blindly.
+- **Calibration held up better than the threshold.** The weekly mean calibrated probability stayed within 2.7 points of the observed cancellation rate on average. Action on an alert is to re-set the threshold on recent matured outcomes, not to retrain blindly.
 - PSI on single weeks is noisy because group bookings arrive in bursts, so the API and the replay use a rolling window.
 
 [Weekly table](outputs/monitoring/weekly_replay.csv) · [summary](outputs/monitoring/summary.json)
@@ -265,7 +280,7 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 ## Model interpretation and limitations
 
 - Logistic contributions explain the score mechanically. They are not causal effects.
-- `country` may carry information recorded after booking (see the input-removal check above). A production version should use the country known at booking time.
+- `country` was removed from the deployed model because it may carry information recorded after booking ([Why country was removed](#why-country-was-removed)). The notebook comparison and the tracked experiments still include it as recorded history. A production version could add it back only if the country known at booking time is available.
 - The risk score is a ranking tool, not a guarantee for an individual booking.
 - The calibrated probability was fitted on early post-cutoff outcomes and checked on later ones. A shift in the cancellation base rate would require recalibration.
 - The threshold simulator reuses one historical holdout for scenario exploration. It is not a second independent validation.

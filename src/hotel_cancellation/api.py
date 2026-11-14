@@ -73,7 +73,6 @@ class Booking(BaseModel):
                 "children": 0,
                 "babies": 0,
                 "meal": "BB",
-                "country": "PRT",
                 "market_segment": "Online TA",
                 "distribution_channel": "TA/TO",
                 "is_repeated_guest": 0,
@@ -98,7 +97,6 @@ class Booking(BaseModel):
     children: int = Field(ge=0, le=10)
     babies: int = Field(ge=0, le=10)
     meal: str
-    country: str
     market_segment: str
     distribution_channel: str
     is_repeated_guest: Literal[0, 1]

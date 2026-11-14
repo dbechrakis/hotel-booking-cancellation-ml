@@ -63,9 +63,10 @@ def chronological_split(frame: pd.DataFrame, quantile: float = 0.8) -> TemporalS
     return TemporalSplit(cutoff, train_mask, test_mask, purged_mask, booking_date)
 
 
-def feature_target(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+def feature_target(frame: pd.DataFrame, features=FEATURES) -> tuple[pd.DataFrame, pd.Series]:
     """Return the explicit pre-outcome feature contract and binary target."""
-    missing = set(FEATURES + [TARGET]) - set(frame.columns)
+    features = list(features)
+    missing = set(features + [TARGET]) - set(frame.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
-    return frame[FEATURES].copy(), frame[TARGET].astype(int).copy()
+    return frame[features].copy(), frame[TARGET].astype(int).copy()

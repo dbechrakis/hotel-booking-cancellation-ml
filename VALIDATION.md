@@ -64,3 +64,14 @@ The app is a portfolio decision-support demonstration. No intervention success o
   - Realised recall was below 80% in 26 of 27 weeks.
   - PSI and recall correlate at −0.62.
 - The shift is mostly non-refundable bookings: 13.1% of the calibration window, 1.4% of the evaluation bookings.
+
+## Removed country from the deployed model, with the comparison — 2026-11-14
+
+- The notebook's comparison, the Random Forest and the tracked experiments were run with `country` as an input. They are unchanged and recorded as history. The deployed contract now has 20 features and no longer accepts `country`.
+- Reason: the guest's country is often confirmed only at check-in, so a cancelled booking can keep the hotel's default country. Portuguese bookings are 62% of cancellations and cancel at 56.6% against 23.6% for the rest. The data cannot separate leakage from a real domestic effect.
+- `scripts/country_check.py` scores both variants on the same split with the same calibration window and recall rule (`outputs/country_check.json`). Without `country`: ROC-AUC 0.7753 → 0.7432, average precision 0.6457 → 0.6224, ECE after isotonic 0.013 → 0.025, recall at the threshold 69.6% → 66.3%, precision 45.3% → 42.9%.
+- `scripts/train_decision_artifacts.py` first reproduces the committed Logistic Regression row with `country` (tolerance 1e-6), then fits the deployed model without it. The artifacts, the calibrator, the threshold (0.372 → 0.469), the holdout predictions and `outputs/monitoring/` were regenerated. The evidence check now compares the committed row with `notebook_reference_metrics` and the feature list with the notebook's list minus `removed_inputs`.
+- Monitoring replay on the new model: the first alert is still 2017-02-20, 23 of 27 weeks are alerts, realised recall is below 80% in 27 of 27 weeks (it was 26), and PSI and recall correlate at −0.23 (it was −0.62). The shortfall is no longer predicted as well by the PSI alone.
+- The API, the app, the example booking and the docs lost the field. A request that carries `country` is rejected (422). `make check` passes (38 tests, evidence check, lint).
+- Not rerun: the MLflow tracking, the notebook, the Hugging Face deployment. The hosted app needs a redeploy to use the new artifacts.
+

@@ -27,7 +27,14 @@ from sklearn.metrics import (  # noqa: E402
 )
 
 from hotel_cancellation.calibration import calibration_summary, reliability_table  # noqa: E402
-from hotel_cancellation.contracts import CATEGORICAL_FEATURES, FEATURES, NUMERIC_FEATURES  # noqa: E402
+from hotel_cancellation.contracts import (  # noqa: E402
+    CATEGORICAL_FEATURES,
+    FEATURES,
+    NOTEBOOK_CATEGORICAL_FEATURES,
+    NOTEBOOK_FEATURES,
+    NUMERIC_FEATURES,
+    REMOVED_AFTER_REVIEW,
+)
 from hotel_cancellation.data import chronological_split, feature_target, source_sha256  # noqa: E402
 from hotel_cancellation.monitoring import reference_profile  # noqa: E402
 from hotel_cancellation.model import (  # noqa: E402
@@ -63,6 +70,18 @@ def recall_threshold(scores, outcomes, target_recall: float) -> float:
     return float(positive_scores[needed - 1])
 
 
+def classification_metrics(outcomes, scores) -> dict:
+    predictions = (scores >= METRIC_THRESHOLD).astype(int)
+    return {
+        "accuracy": accuracy_score(outcomes, predictions),
+        "precision": precision_score(outcomes, predictions),
+        "recall": recall_score(outcomes, predictions),
+        "f1": f1_score(outcomes, predictions),
+        "average_precision": average_precision_score(outcomes, scores),
+        "roc_auc": roc_auc_score(outcomes, scores),
+    }
+
+
 def plot_reliability(tables: dict[str, pd.DataFrame], path: Path) -> None:
     fig, ax = plt.subplots(figsize=(5.5, 5))
     ax.plot([0, 1], [0, 1], color="black", linestyle="--", linewidth=0.8, label="Perfect calibration")
@@ -87,30 +106,27 @@ def main() -> None:
 
     raw = pd.read_csv(SOURCE)
     split = chronological_split(raw)
-    features, target = feature_target(raw)
+    notebook_features, target = feature_target(raw, NOTEBOOK_FEATURES)
+    reference = build_pipeline(NUMERIC_FEATURES, NOTEBOOK_CATEGORICAL_FEATURES)
+    reference.fit(notebook_features.loc[split.train_mask], target.loc[split.train_mask])
+    reference_scores = reference.predict_proba(notebook_features.loc[split.test_mask])[:, 1]
+    reference_target = target.loc[split.test_mask]
+    reference_metrics = classification_metrics(reference_target, reference_scores)
+    expected_metrics = pd.read_csv(OUTPUT_DIR / "classification_metrics.csv").set_index("model")
+    expected = expected_metrics.loc["Logistic Regression", list(reference_metrics)]
+    for metric, value in reference_metrics.items():
+        if abs(value - float(expected[metric])) > REPRODUCTION_TOLERANCE:
+            raise ValueError(
+                f"Reproduced {metric} {value:.8f} differs from committed {float(expected[metric]):.8f}"
+            )
 
+    features, target = feature_target(raw)
     pipeline = build_pipeline()
     pipeline.fit(features.loc[split.train_mask], target.loc[split.train_mask])
     test_features = features.loc[split.test_mask]
     test_target = target.loc[split.test_mask]
     scores = pipeline.predict_proba(test_features)[:, 1]
-    predictions = (scores >= METRIC_THRESHOLD).astype(int)
-
-    metrics = {
-        "accuracy": accuracy_score(test_target, predictions),
-        "precision": precision_score(test_target, predictions),
-        "recall": recall_score(test_target, predictions),
-        "f1": f1_score(test_target, predictions),
-        "average_precision": average_precision_score(test_target, scores),
-        "roc_auc": roc_auc_score(test_target, scores),
-    }
-    expected_metrics = pd.read_csv(OUTPUT_DIR / "classification_metrics.csv").set_index("model")
-    expected = expected_metrics.loc["Logistic Regression", list(metrics)]
-    for metric, value in metrics.items():
-        if abs(value - float(expected[metric])) > REPRODUCTION_TOLERANCE:
-            raise ValueError(
-                f"Reproduced {metric} {value:.8f} differs from committed {float(expected[metric]):.8f}"
-            )
+    metrics = classification_metrics(test_target, scores)
 
     # Forward recalibration: fit on the earliest post-cutoff bookings, evaluate on the rest.
     booking_date = split.booking_date.loc[split.test_mask]
@@ -208,6 +224,8 @@ def main() -> None:
         ),
         "features": FEATURES,
         "holdout_metrics": metrics,
+        "removed_inputs": REMOVED_AFTER_REVIEW,
+        "notebook_reference_metrics": reference_metrics,
         "calibration": calibration,
         "numeric_defaults": numeric_defaults,
         "categorical_defaults": categorical_defaults,

@@ -31,11 +31,12 @@ artifact=ROOT/'artifacts/cancellation_logistic.joblib'
 assert hashlib.sha256(artifact.read_bytes()).hexdigest()==metadata['artifact_sha256']
 assert hashlib.sha256((ROOT/'artifacts/cancellation_calibrator.joblib').read_bytes()).hexdigest()==metadata['calibrator_sha256']
 lr=[r for r in rows if r['model']=='Logistic Regression'][0]
-for k,value in metadata['holdout_metrics'].items(): close(lr[k],value)
+for k,value in metadata['notebook_reference_metrics'].items(): close(lr[k],value)
+assert set(metadata['holdout_metrics'])==set(metadata['notebook_reference_metrics'])
 cal=metadata['calibration']
 assert cal['calibration_rows']+cal['evaluation_rows']==v['test_rows']
 assert cal['evaluation_calibrated']['brier']<cal['evaluation_uncalibrated']['brier']
-assert metadata['features']==v['features']
+assert metadata['features']==[f for f in v['features'] if f not in metadata['removed_inputs']]
 predictions=table('outputs/holdout_predictions.csv.gz')
 assert len(predictions)==v['test_rows']
 assert sum(int(r['is_canceled']) for r in predictions)/len(predictions)==v['test_cancellation_rate']

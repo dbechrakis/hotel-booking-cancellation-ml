@@ -9,7 +9,7 @@ policy.
 
 | Element | Choice |
 |---|---|
-| Population | Bookings whose risk score clears the review threshold (0.372, set for 80% recall) |
+| Population | Bookings whose risk score clears the review threshold (0.469, set for 80% recall) |
 | Randomisation | Booking-level, 50/50 into contact vs. no contact, assigned at scoring time |
 | Primary metric | Cancellation rate per arm, measured once the scheduled stay date has passed |
 | Guardrails | Contact cost per booking, ADR of retained bookings, complaint/opt-out rate |
@@ -24,31 +24,31 @@ high-risk bookings cancel more (the model already ranks that).
 
 The baseline should come from the regime the test would run in. On the 16,835
 later bookings (after the window where the threshold and calibrator were set),
-7,548 clear the 0.372 risk-score threshold and **45.28%** of them cancelled. That
+7,589 clear the 0.469 risk-score threshold and **42.89%** of them cancelled. That
 is the control-arm baseline. Over the 29 weeks of those booking dates this is
-about **259 flagged bookings per week** across both hotels.
+about **260 flagged bookings per week** across both hotels.
 
-An earlier version of this page used all 23,989 holdout bookings (49.31%, 341 a
+An earlier version of this page used all 23,989 holdout bookings (47.51%, 343 a
 week). That pooled in the threshold window, whose cancellation rate was higher
 (37% against 29%) because non-refundable bookings later almost disappeared (see
-the README's monitoring section). It understated the test's length by about half.
+the README's monitoring section). It understated the test's length by about a quarter.
 
 Sample sizes from `experiment_sample_size()` in
 [`decision.py`](../src/hotel_cancellation/decision.py):
 
 | Relative reduction to detect | Per arm | Total | Approx. weeks of flagged volume |
 |---:|---:|---:|---:|
-| 30% (45.3% → 31.7%) | 201 | 402 | 1.6 |
-| 20% (45.3% → 36.2%) | 461 | 922 | 3.6 |
-| 15% (45.3% → 38.5%) | 828 | 1,656 | 6.4 |
-| 10% (45.3% → 40.8%) | 1,876 | 3,752 | 14.5 |
-| 5% (45.3% → 43.0%) | 7,551 | 15,102 | 58 |
+| 30% (42.9% → 30.0%) | 219 | 438 | 1.7 |
+| 20% (42.9% → 34.3%) | 505 | 1,010 | 3.9 |
+| 15% (42.9% → 36.5%) | 907 | 1,814 | 7.0 |
+| 10% (42.9% → 38.6%) | 2,060 | 4,120 | 15.8 |
+| 5% (42.9% → 40.7%) | 8,304 | 16,608 | 63.8 |
 
 ```python
 from hotel_cancellation.decision import experiment_sample_size
 
-experiment_sample_size(baseline_cancellation_rate=0.4528, relative_reduction=0.10)
-# 1876 bookings per arm
+experiment_sample_size(baseline_cancellation_rate=0.4289, relative_reduction=0.10)
+# 2060 bookings per arm
 ```
 
 A realistic retention contact is more likely to move cancellations by single

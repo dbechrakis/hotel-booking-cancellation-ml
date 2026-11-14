@@ -27,8 +27,11 @@ class ModelVersionError(ValueError):
     """Raised when the installed scikit-learn differs from the one that exported the artifact."""
 
 
-def build_pipeline() -> Pipeline:
-    """Build the exact compact classification pipeline used for deployment."""
+def build_pipeline(numeric=NUMERIC_FEATURES, categorical=CATEGORICAL_FEATURES) -> Pipeline:
+    """Build the exact compact classification pipeline used for deployment.
+
+    The two arguments default to the deployed feature contract. They exist so that an input can be
+    left out for a comparison, as ``scripts/country_check.py`` does."""
     preprocessor = ColumnTransformer(
         [
             (
@@ -39,7 +42,7 @@ def build_pipeline() -> Pipeline:
                         ("scale", StandardScaler()),
                     ]
                 ),
-                NUMERIC_FEATURES,
+                list(numeric),
             ),
             (
                 "cat",
@@ -52,7 +55,7 @@ def build_pipeline() -> Pipeline:
                         ),
                     ]
                 ),
-                CATEGORICAL_FEATURES,
+                list(categorical),
             ),
         ]
     )
