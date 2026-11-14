@@ -116,3 +116,8 @@ Written before the rule below was scored. The README says the action on an alert
 
 - Ruff now selects the rule families E, F, I, UP, B and SIM, with line length (E501) and zip without strict (B905) ignored, in `pyproject.toml`. The Makefile and the evidence workflow use that configuration. Before this the check selected syntax errors and unused names only.
 - 19 import-sorting findings were fixed automatically. No behaviour changed. The monitoring replay was rerun after the change and its committed outputs are byte-identical, and the 43 tests and the evidence check pass.
+
+## Second review of the country removal — 2026-11-14
+
+- A second reader checked the README against the new artifacts. One statement was off: non-refundable bookings were said to score 0.99 or more. Under the model without `country` they score 0.97 or more (85% of them in the threshold window are at 0.99 or more). The README is corrected. Their shares, 13.1% of the threshold window and 1.4% afterwards, are unchanged.
+- The screenshot in the README was taken before the removal and is now labelled as such. It has not been retaken.

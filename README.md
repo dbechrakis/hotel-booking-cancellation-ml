@@ -22,7 +22,7 @@ An end-to-end machine-learning decision product that ranks hotel booking cancell
 
 ![Live Hotel app scoring a sample booking and showing model contributions](docs/live-app-scoring.jpg)
 
-The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions. The displayed economic value is a scenario, not measured intervention uplift.
+The live app scores a booking and simulates contact policies against a saved later-period holdout. The screenshot shows one example with the default assumptions. The displayed economic value is a scenario, not measured intervention uplift. The screenshot predates the removal of `country` from the model, so it still shows that field and the earlier scores.
 
 ## Business problem
 
@@ -287,7 +287,7 @@ Outcomes arrive only after a booking's stay, so the live service cannot measure 
 ![Weekly monitoring replay](outputs/monitoring/weekly_replay.png)
 
 - **The monitor would have alerted in the third week (2017-02-20) and stayed at warn or alert every week after, months before outcomes confirmed the shortfall.** Realised recall stayed below the 80% target in 27 of 27 weeks. Rolling PSI and weekly recall correlate at −0.23.
-- **The cause is visible in the scores.** Non-refundable bookings were 13.1% of the threshold window but 1.4% afterwards. These are near-certain cancellations (risk score ≥ 0.99) that had made 80% recall easy to reach. Once they disappear the top score decile empties, PSI jumps, and the remaining cancellations are harder to catch.
+- **The cause is visible in the scores.** Non-refundable bookings were 13.1% of the threshold window but 1.4% afterwards. These are near-certain cancellations (risk score of 0.97 or more) that had made 80% recall easy to reach. Once they disappear the top score decile empties, PSI jumps, and the remaining cancellations are harder to catch.
 - **Calibration held up better than the threshold.** The weekly mean calibrated probability stayed within 2.7 points of the observed cancellation rate on average. Action on an alert is to re-set the threshold on recent matured outcomes, not to retrain blindly.
 - PSI on single weeks is noisy because group bookings arrive in bursts, so the API and the replay use a rolling window.
 - **What following the action would have done** ([`scripts/action_replay.py`](scripts/action_replay.py), rule fixed in [`VALIDATION.md`](VALIDATION.md) before the run). When the rolling PSI is at alert for two weeks in a row, re-set the threshold to 80% recall on the latest 2,000 bookings whose stay had ended, at most every four weeks. Over the same 27 weeks this re-set the threshold six times and skipped two (too few matured cancellations). Mean weekly recall rose from **65.4% to 86.7%** and the weeks below 80% fell from 27 to 7. **It did so by flagging far more bookings**: the mean flagged share rose from 44% to 73% and precision fell from 42.0% to 34.4%. Bookings whose stay has ended are short stays, so the pool does not look like the week the threshold then serves, and the first re-set overshoots (recall above 90% for six weeks). A usable rule would need a cap on the flagged share. [Weekly table](outputs/monitoring/action_replay.csv)
