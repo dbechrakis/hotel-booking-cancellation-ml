@@ -121,3 +121,80 @@ Written before the rule below was scored. The README says the action on an alert
 
 - A second reader checked the README against the new artifacts. One statement was off: non-refundable bookings were said to score 0.99 or more. Under the model without `country` they score 0.97 or more (85% of them in the threshold window are at 0.99 or more). The README is corrected. Their shares, 13.1% of the threshold window and 1.4% afterwards, are unchanged.
 - The screenshot in the README was taken before the removal and is now labelled as such. It has not been retaken.
+
+## Overbooking study, design fixed before it was run (2026-11-15)
+
+Written after the counts of the gate and before any forecast was scored. The counts are in `outputs/overbooking/counts.json`.
+
+**Question.** First, for a night and a number of days before it, how well does each method predict how many of the bookings on hand will show up. Second, given that forecast, what room limit does a cost rule recommend, and what would it have gained or cost under stated demand scenarios. The first part is scored exactly. The second part is scenario arithmetic and is labelled so.
+
+**Definitions.**
+
+- Booking date is arrival date minus `lead_time`, as `data.py` computes it. Departure is arrival plus nights. A booking covers night d when arrival is on or before d and d is before departure. Bookings with zero nights are left out of the room ledger.
+- The decision date for night d at horizon h is t = d minus h days.
+- On hand at (d, h): bookings that cover d, with booking date on or before t, not cancelled by t. A cancelled booking's `reservation_status_date` is its cancellation date. A no-show counts as not showing up and is on hand until the night.
+- A booking shows when `is_canceled` is 0.
+- Pickup at (d, h): bookings that cover d with booking date after t and that show.
+- Capacity C, per hotel: the largest number of occupied rooms on any night before 2017-01-12. The file has no capacity field, so this is an inference. The recomputed values are 226 for the City Hotel and 187 for the Resort Hotel, equal to the feasibility counts. The 95th percentile of occupancy before the cutoff is 224 and 183.
+- Horizons: 30, 14, 7 and 3 days.
+
+**Which bookings can be scored honestly.** The deployed model trained on bookings whose stay ended before 2017-01-12. Every booking that was not in that training set, including the rows the split calls purged, is scored with the frozen artifact. Nothing is retrained.
+
+**Methods.** Each gives the probability that a booking alive at t shows up.
+
+| Method | Probability of showing |
+|---|---|
+| `flat` | One minus the share of on-hand bookings at horizon h that later failed to show, per hotel, from past nights only. |
+| `segment` | The same by hotel, `deposit_type` and `market_segment`, each cell shrunk toward the hotel rate with weight n over n plus 50. |
+| `at_booking` | One minus the deployed calibrated probability, unchanged. It is expected to be badly wrong because it is made at booking time. It is included to show the size of the error. |
+| `model` | An isotonic calibrator of "later failed to show" on the deployed `risk_score`, fitted per horizon on past bookings that were alive at that horizon. |
+| `model_od` | `model`, with the count distribution widened by an overdispersion factor estimated from past nights. |
+
+A method used at decision date t may learn only from bookings that arrived before t. Methods are refitted on the first day of each calendar month from all eligible past bookings. The calibrator and the baselines learn only from bookings the frozen model did not train on.
+
+**Evaluation nights.** From 2017-04-01 to 2017-08-31, both hotels, four horizons. Gate, counts only: at the first decision date of each horizon the pool must hold at least 1,000 bookings alive at that horizon with at least 50 that later failed to show, per hotel. If a horizon fails, the start moves two weeks later for all horizons, at most twice.
+
+**Gate result.** The first start, 2017-04-01, failed. At the first decision date of the 30-day horizon, 2017-03-02, the Resort Hotel pool held 739 alive bookings with 122 failures, below 1,000. The start moved two weeks to **2017-04-15**. At that start every horizon and hotel passes, with 1,024 alive bookings for the Resort Hotel at 30 days as the smallest pool. There are **139 evaluation nights** per hotel, from 2017-04-15 to 2017-08-31.
+
+**The count forecast.** The number of on-hand bookings that show is a sum of independent yes or no outcomes with different probabilities. Its distribution, the Poisson binomial, is computed exactly by convolution. Bookings are not independent, since a group cancels together, so the exact distribution is expected to be too narrow. `model_od` widens it by mixing with a discretised normal of the missing variance. Scores per method and horizon, pooled over nights and hotels: mean error in rooms (predicted mean minus observed shows), continuous ranked probability score in rooms, and coverage of the central 80% and 95% intervals. Intervals for the scores come from a block bootstrap over calendar weeks, because adjacent nights share most of their bookings.
+
+**The room limit.** The hotel earns r for a room filled and pays w for a guest it cannot house, with r equal to 1. Accept extra room k while P(S_k at least C plus 1) is at most r over r plus w. S_k is the shows from the bookings on hand, plus k more bookings that each show with the method's average probability, plus the pickup still to come. The pickup forecast is the empirical distribution of pickup at this horizon for this hotel and weekday, from past nights only, convolved in. Cost ratios w over r are 1, 2 and 3, and the middle one is the headline. No currency figure is claimed.
+
+**Scenario value.** A hotel that does not overbook records no turned-away guests, so the value is computed under a stated share of the extra rooms that would in fact have been booked. A constrained night is one where the bookings on hand at the horizon are at least 90% of capacity. Extra bookings taken are the demand share times k on constrained nights and 0 elsewhere, for demand shares of 0.25, 0.5 and 1. Their show rate is the realised show rate of that night's bookings made after the decision date, or the hotel's rate when the night has fewer than 10 such bookings. Rooms free on the night are capacity minus the rooms actually occupied, and not below zero. Gain is extra shows up to the free rooms. Walks are extra shows beyond them. Net value is gain minus the cost ratio times walks. Tables report it per hotel per 100 nights next to "no overbooking", which is zero by definition, and each carries the line: scenario arithmetic under an assumed demand share, not a measured outcome.
+
+**Implementation rules, fixed before the run.**
+
+- The pool at a refit date R is every booking the frozen model did not train on that arrived before R and was alive at its own decision date for horizon h. The first refit is 2017-02-01. Forecasts are produced for every night from 2017-02-01 plus h days to 2017-08-31. Only nights from the evaluation start are scored.
+- The overdispersion factor is updated daily. At decision date t it is, per hotel and horizon, the sum of squared errors over the sum of predicted variances of `model` over nights before t that have a forecast. It is 1 with fewer than 7 such nights and never below 1.
+- The pickup distribution uses the 16 most recent same-weekday nights of that hotel before t, from the whole history.
+- The show probability of an extra booking is the mean of the method's probabilities over the bookings on hand. The rule is searched up to 40 extra rooms.
+- Central intervals come from the discrete distribution and include both end points. The bootstrap has 1,000 resamples of calendar weeks with seed 42.
+- The sensitivity line reports the scenario value with capacity minus 5 and plus 5, at the middle cost ratio and a demand share of 0.5.
+
+**Expectations.**
+
+- O1. `at_booking` over-predicts the rooms lost at every horizon. Its mean error is negative (fewer shows predicted than realised) by more than 5 rooms per night at the 7-day horizon for the City Hotel.
+- O2. `model` has a lower continuous ranked probability score than `flat` at the 30-day and 14-day horizons. No prediction at 7 and 3 days, where little is left to predict.
+- O3. `model` has a lower score than `segment` at the 30-day horizon by more than the bootstrap standard error of the difference. If the difference is within one standard error, the reading is "the booking-level model adds nothing over three segment rates", and that sentence goes in the README.
+- O4. The exact count distribution is too narrow. The 80% interval of `model` covers fewer than 70% of nights at the 30-day horizon.
+- O5. `model_od` covers between 70% and 90% of nights with its 80% interval at every horizon.
+- O6. At a cost ratio of 2 and the 30-day horizon, the rule under `model_od` recommends at least one extra room on more than half of the constrained nights.
+- O7. No prediction on the sign of the net value. Reported for all nine combinations of cost ratio and demand share.
+
+**What counts.** Each expectation is graded by its own rule from `outputs/overbooking/summary.json`. O1 is graded for the City Hotel at the 7-day horizon on the mean error, and it also requires a negative mean error at every horizon for both hotels. O2 to O5 are graded on scores pooled over both hotels and all evaluation nights. O6 pools both hotels. The methods, horizons, evaluation window, capacity rule, cost ratios and demand shares are not changed after the first run.
+
+**Not claimed.** That the capacity is the hotels' true room count. That demand existed for the extra rooms. That a walk costs a fixed multiple of a room night. Any effect on guests, reviews or repeat business. Independence between nights.
+
+## Overbooking study, result (2026-11-15)
+Run once with `scripts/overbooking_backtest.py` on the design fixed above (design commit `59ca1c6`). Nothing was changed after the run. An earlier launch of the same script stopped on a date-type error in the score table, before any score was written or read, and was fixed and rerun. Numbers come from `outputs/overbooking/summary.json` and the CSV files next to it, and `ci/verify_evidence.py` recomputes the ones the README quotes. The scenario figures are scenario arithmetic under an assumed demand share, not a measured outcome. Failed expectations come first.
+- O2. Failed. At the 30-day horizon `model` scores 9.23 rooms against 7.35 for `flat`. At 14 days it scores 6.04 against 5.39. A lower score is better, so the booking-level model is worse than one flat rate by horizon.
+- O3. Failed. At the 30-day horizon `segment` minus `model` is -3.13 rooms, with a bootstrap standard error of 0.37 (interval -3.89 to -2.46). The model is worse than three segment rates by more than eight standard errors, so the difference is not within one standard error. The booking-level model adds nothing over three segment rates here, and does worse.
+- O5. Failed. `model_od` covers 95.3%, 88.1%, 93.5% and 96.4% of nights with its 80% interval at 30, 14, 7 and 3 days. Only the 14-day value is inside 70% to 90%. The widened distribution is too wide. The factor is estimated from squared errors that include the bias, and every method under-predicts shows, so the factor absorbs the bias as variance.
+- O6. Failed. At a cost ratio of 2 and 30 days, `model_od` recommends an extra room on 12.8% of the 117 constrained hotel nights, not more than half.
+- O1. Passed. The mean error of `at_booking` is negative at every horizon for both hotels. For the City Hotel at 7 days it is -69.7 rooms per night. It predicts about 72 too few shows at 3 days.
+- O4. Passed. The 80% interval of `model` covers 21.2% of nights at 30 days, far below 70%. The exact distribution is far too narrow.
+- O7. Not graded. The net value is reported for all nine combinations of cost ratio and demand share in `scenarios.csv`. Across the 20 method and horizon cells, the number with a negative net value (both hotels, no capacity shift) is: cost ratio 1, demand shares 0.25, 0.5 and 1: 0, 4 and 4. Cost ratio 2: 2, 4 and 4. Cost ratio 3: 4, 4 and 5. The negative cells are mostly `at_booking`, which sells far too many rooms.
+
+**What else the run showed.** Every method under-predicts shows. The bias of `flat` is -8.5 rooms per night at 30 days. A cause was not tested. One reading is that failure rates learned in January to March were higher than in April to August. The first start of the evaluation window, 2017-04-01, failed the gate and the window started on 2017-04-15, with 139 nights per hotel.
+
+**Limits.** Capacity is the highest occupancy seen before 2017-01-12, not a room count. The data records no turned-away demand, so the value depends on the assumed demand share. About 139 nights for each of two hotels in one spring and summer, and adjacent nights share bookings. The frozen model was built to rank bookings at booking time and is reused with a horizon calibrator. Room types are ignored. The frozen artifact scored some bookings with zero guests, which its API contract would reject. They were scored directly through the pipeline and the calibrator, which were not modified.
