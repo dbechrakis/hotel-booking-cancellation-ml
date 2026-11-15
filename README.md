@@ -218,6 +218,7 @@ hotel-booking-cancellation-ml/
 │   ├── calibration.py                # Reliability, ECE, Brier diagnostics
 │   ├── monitoring.py                 # PSI drift monitor for live scores
 │   ├── decision.py                   # Risk bands, economics, experiment sizing
+│   ├── overbooking_view.py           # Read-only view of the room-limit results
 │   ├── ledger.py                     # Room ledger: on hand, pickup, occupancy, capacity
 │   ├── overbooking.py                # Count forecasts and the room-limit rule
 │   └── api.py                        # FastAPI scoring service

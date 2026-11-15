@@ -13,6 +13,7 @@ from hotel_cancellation.decision import (
     threshold_table,
 )
 from hotel_cancellation.model import load_model_bundle, local_contributions
+from hotel_cancellation.overbooking_view import limits_view, load_limits
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -145,8 +146,8 @@ def main() -> None:
 
     bundle, holdout = load_resources()
     metadata = bundle.metadata
-    scoring_tab, policy_tab, evidence_tab = st.tabs(
-        ["Score a booking", "Threshold simulator", "Model evidence"]
+    scoring_tab, policy_tab, evidence_tab, rooms_tab = st.tabs(
+        ["Score a booking", "Threshold simulator", "Model evidence", "Room limit"]
     )
 
     with scoring_tab:
@@ -273,6 +274,27 @@ def main() -> None:
                 "limitations": metadata["limitations"],
             }
         )
+
+
+    with rooms_tab:
+        st.subheader("Rooms to sell above capacity (scenario)")
+        st.caption(
+            "Capacity is inferred as the highest occupancy seen before 2017-01-12. The rule is "
+            "scenario arithmetic from committed results. It reads them and calls no model."
+        )
+        limits, counts = load_limits()
+        r1, r2, r3, r4 = st.columns(4)
+        hotel = r1.selectbox("Hotel", sorted(limits["hotel"].unique()))
+        horizon = r2.selectbox("Days before the night", sorted(limits["horizon"].unique(), reverse=True))
+        method = r3.selectbox("Method", ["model_od", "model", "segment", "flat", "at_booking"])
+        ratio = r4.selectbox("Cost of a walk, in room nights", sorted(limits["cost_ratio"].unique()), index=1)
+        view = limits_view(limits, counts["capacity"][hotel], hotel, int(horizon), method, int(ratio))
+        st.line_chart(view.set_index("night")[["extra_rooms", "headroom"]])
+        st.caption(
+            "Extra rooms are the rule's recommendation. Headroom is capacity minus the bookings on hand "
+            "at that horizon. Constrained nights have bookings on hand of at least 90% of capacity."
+        )
+        st.dataframe(view, use_container_width=True, hide_index=True)
 
 
 main()
