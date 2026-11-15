@@ -168,6 +168,39 @@ Assumed net value
 
 These formulas are scenarios, not realised uplift. The dataset contains no randomized retention intervention, so success rate and recoverable margin must be supplied as assumptions.
 
+## From a probability to a room limit
+
+Capacity is inferred, since the file has none: it is the highest occupancy seen before 2017-01-12, 226 rooms for the City Hotel and 187 for the Resort Hotel. The value of any room limit below is scenario arithmetic under an assumed demand share, not a measured outcome. The question is how many rooms a hotel could sell above capacity for a night, given the bookings on hand at 30, 14, 7 or 3 days before it. It was answered on 139 nights per hotel from 2017-04-15 to 2017-08-31, with every method learning only from nights already past.
+
+**The booking-level model did not beat a flat rate.** The deployed probability is made at booking time and is badly wrong for bookings that are still alive days before arrival. Used as it is (`at_booking`) it predicts about 70 too few arriving guests per night for the City Hotel at 7 days. Recalibrated per horizon (`model`) it is still worse than one flat failure rate per hotel (`flat`) and than three segment rates (`segment`). The exact count distribution is far too narrow, so a `model_od` variant widens it, and then overshoots.
+
+| Method | Score at 30 days | at 14 | at 7 | at 3 | 80% coverage at 30 days | at 14 | at 7 | at 3 |
+|---|---|---|---|---|---|---|---|---|
+| `flat` | 7.35 | 5.39 | 3.79 | 2.73 | 34.9% | 36.0% | 37.8% | 45.3% |
+| `segment` | 6.10 | 4.58 | 3.13 | 2.16 | 43.5% | 45.7% | 50.0% | 56.8% |
+| `at_booking` | 38.09 | 45.90 | 51.08 | 53.45 | 1.1% | 0.0% | 0.0% | 0.0% |
+| `model` | 9.23 | 6.04 | 4.23 | 2.74 | 21.2% | 30.6% | 32.7% | 41.7% |
+| `model_od` | 7.63 | 5.17 | 3.68 | 2.51 | 95.3% | 88.1% | 93.5% | 96.4% |
+
+The score is the continuous ranked probability score in rooms, so lower is better. Coverage is the share of nights on which the count of arriving guests fell inside the method's central 80% interval. Both hotels are pooled.
+
+**Net value of the rule, per 100 hotel nights, at a cost ratio of 2.** A walked guest costs twice a room night. The three columns are the share of the extra rooms assumed to be booked on constrained nights. *Scenario arithmetic under an assumed demand share, not a measured outcome.*
+
+| Method | Horizon | Share 0.25 | Share 0.5 | Share 1 |
+|---|---|---|---|---|
+| `flat` | 30 days | 5.3 | 8.4 | 4.1 |
+| `segment` | 30 days | 3.0 | 5.0 | 5.2 |
+| `at_booking` | 30 days | -5.5 | -320.9 | -1225.4 |
+| `model` | 30 days | 11.0 | 16.0 | 0.6 |
+| `model_od` | 30 days | 4.7 | 8.3 | 10.6 |
+| `flat` | 7 days | 66.2 | 117.5 | 117.6 |
+| `segment` | 7 days | 55.5 | 99.6 | 118.4 |
+| `at_booking` | 7 days | 2.0 | -942.8 | -3185.3 |
+| `model` | 7 days | 74.7 | 133.4 | 115.3 |
+| `model_od` | 7 days | 63.7 | 115.0 | 126.2 |
+
+Selling on `at_booking` loses room nights at every share above 0.25, because it sells far too many. The other methods gain in this scenario. With capacity 5 rooms lower, equal to or 5 rooms higher, the net value at 30 days, a share of 0.5 and a cost ratio of 2 is: flat -3.4 / 8.4 / 21.8, segment 1.4 / 5.0 / 14.1, model -10.8 / 16.0 / 38.2, model_od 0.4 / 8.3 / 20.2, in room nights per 100 hotel nights. See [docs/overbooking-method.md](docs/overbooking-method.md) for the rule and its limits and [VALIDATION.md](VALIDATION.md#overbooking-study-result-2026-11-15) for every expectation.
+
 ## Repository structure
 
 ```text
@@ -185,13 +218,17 @@ hotel-booking-cancellation-ml/
 │   ├── calibration.py                # Reliability, ECE, Brier diagnostics
 │   ├── monitoring.py                 # PSI drift monitor for live scores
 │   ├── decision.py                   # Risk bands, economics, experiment sizing
+│   ├── ledger.py                     # Room ledger: on hand, pickup, occupancy, capacity
+│   ├── overbooking.py                # Count forecasts and the room-limit rule
 │   └── api.py                        # FastAPI scoring service
 ├── notebooks/                        # Executed modelling study
 ├── scripts/
 │   ├── download_data.py              # Fingerprinted public source
 │   ├── train_decision_artifacts.py   # Reproducible export
 │   ├── track_experiments.py          # MLflow comparison + model registry
-│   └── monitoring_replay.py          # Weekly drift replay with hindsight outcomes
+│   ├── monitoring_replay.py          # Weekly drift replay with hindsight outcomes
+│   ├── overbooking_counts.py         # Capacity, gate counts and constrained nights
+│   └── overbooking_backtest.py       # Overbooking study (make overbooking)
 ├── tests/                             # Decision, artifact and API tests
 ├── outputs/                           # Metrics, figures, holdout evidence
 ├── docs/                              # Architecture + archived reports

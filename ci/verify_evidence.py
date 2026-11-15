@@ -53,4 +53,29 @@ assert summary['weeks_below_target_recall']==sum(float(r['realised_recall'])<0.8
 assert set(metadata['monitoring_reference'])>={'bin_edges','bin_shares','flagged_share'}
 close(sum(metadata['monitoring_reference']['bin_shares']),1)
 
+ob=json.loads((ROOT/'outputs/overbooking/summary.json').read_text())
+counts=json.loads((ROOT/'outputs/overbooking/counts.json').read_text())
+assert counts['source_sha256']==metadata['source_sha256'] and counts['gate_passed'] and counts['evaluation_nights']==ob['evaluation_nights']
+agg={}
+for r in table('outputs/overbooking/night_forecasts.csv'):
+    a=agg.setdefault((r['method'],int(r['horizon'])),[0,0.0,0]); a[0]+=1; a[1]+=float(r['crps']); a[2]+=int(r['in80'])
+readme=(ROOT/'README.md').read_text()
+for r in ob['forecast_scores_all_hotels']:
+    n,crps,cover=agg[(r['method'],r['horizon'])]
+    assert n==r['nights']; close(crps/n,r['crps']); close(cover/n,r['coverage80'])
+for m in ['flat','segment','at_booking','model','model_od']:
+    row='| `%s` | '%m+' | '.join('%.2f'%(agg[(m,h)][1]/agg[(m,h)][0]) for h in (30,14,7,3))+' | '+' | '.join('%.1f%%'%(100*agg[(m,h)][2]/agg[(m,h)][0]) for h in (30,14,7,3))+' |'
+    assert row in readme,row
+net={}
+for r in table('outputs/overbooking/scenarios.csv'):
+    if r['capacity_shift']=='0' and r['cost_ratio']=='2':
+        a=net.setdefault((r['method'],int(r['horizon']),float(r['demand_share'])),[0,0.0]); a[0]+=int(r['nights']); a[1]+=float(r['net'])
+for h in (30,7):
+    for m in ['flat','segment','at_booking','model','model_od']:
+        row='| `%s` | %d days | '%(m,h)+' | '.join('%.1f'%(100*net[(m,h,s)][1]/net[(m,h,s)][0]) for s in (0.25,0.5,1.0))+' |'
+        assert row in readme,row
+validation=(ROOT/'VALIDATION.md').read_text()
+for q,g in ob['expectations'].items():
+    assert '- %s. %s.'%(q,{True:'Passed',False:'Failed',None:'Not graded'}[g['passed']]) in validation,q
+
 print('Committed evidence and syntax checks passed; see VALIDATION.md for rerun scope.')
