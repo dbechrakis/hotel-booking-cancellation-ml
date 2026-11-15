@@ -1,0 +1,189 @@
+{
+  "source_sha256": "7c2ae42a7353905ea136e5c2287f17c92c5435826598bfbb8491c6f0c7b1fc06",
+  "bookings": 119390,
+  "checked_out": 75166,
+  "cancelled": 43017,
+  "no_show": 1207,
+  "zero_night_bookings": 715,
+  "ledger_rows": 409257,
+  "cutoff": "2017-01-12",
+  "capacity": {
+    "City Hotel": 226,
+    "Resort Hotel": 187
+  },
+  "p95_occupancy_before_cutoff": {
+    "City Hotel": 224.0,
+    "Resort Hotel": 183.0
+  },
+  "evaluation_start": "2017-04-15",
+  "evaluation_end": "2017-08-31",
+  "evaluation_nights": 139,
+  "start_shifts": 1,
+  "initial_gate": [
+    {
+      "horizon": 30,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-03-02",
+      "alive_bookings": 1335,
+      "later_failed_to_show": 308
+    },
+    {
+      "horizon": 30,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-03-02",
+      "alive_bookings": 739,
+      "later_failed_to_show": 122
+    },
+    {
+      "horizon": 14,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-03-18",
+      "alive_bookings": 2715,
+      "later_failed_to_show": 319
+    },
+    {
+      "horizon": 14,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-03-18",
+      "alive_bookings": 1398,
+      "later_failed_to_show": 132
+    },
+    {
+      "horizon": 7,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-03-25",
+      "alive_bookings": 3483,
+      "later_failed_to_show": 249
+    },
+    {
+      "horizon": 7,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-03-25",
+      "alive_bookings": 1835,
+      "later_failed_to_show": 99
+    },
+    {
+      "horizon": 3,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-03-29",
+      "alive_bookings": 4014,
+      "later_failed_to_show": 173
+    },
+    {
+      "horizon": 3,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-03-29",
+      "alive_bookings": 2309,
+      "later_failed_to_show": 92
+    }
+  ],
+  "gate_passed": true,
+  "gate": [
+    {
+      "horizon": 30,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-03-16",
+      "alive_bookings": 1953,
+      "later_failed_to_show": 398
+    },
+    {
+      "horizon": 30,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-03-16",
+      "alive_bookings": 1024,
+      "later_failed_to_show": 153
+    },
+    {
+      "horizon": 14,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-04-01",
+      "alive_bookings": 3566,
+      "later_failed_to_show": 387
+    },
+    {
+      "horizon": 14,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-04-01",
+      "alive_bookings": 1747,
+      "later_failed_to_show": 152
+    },
+    {
+      "horizon": 7,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-04-08",
+      "alive_bookings": 4322,
+      "later_failed_to_show": 284
+    },
+    {
+      "horizon": 7,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-04-08",
+      "alive_bookings": 2262,
+      "later_failed_to_show": 122
+    },
+    {
+      "horizon": 3,
+      "hotel": "City Hotel",
+      "first_decision_date": "2017-04-12",
+      "alive_bookings": 4906,
+      "later_failed_to_show": 186
+    },
+    {
+      "horizon": 3,
+      "hotel": "Resort Hotel",
+      "first_decision_date": "2017-04-12",
+      "alive_bookings": 2831,
+      "later_failed_to_show": 116
+    }
+  ],
+  "constrained_nights": [
+    {
+      "hotel": "City Hotel",
+      "horizon": 30,
+      "constrained_nights": 76,
+      "nights": 139
+    },
+    {
+      "hotel": "City Hotel",
+      "horizon": 14,
+      "constrained_nights": 91,
+      "nights": 139
+    },
+    {
+      "hotel": "City Hotel",
+      "horizon": 7,
+      "constrained_nights": 103,
+      "nights": 139
+    },
+    {
+      "hotel": "City Hotel",
+      "horizon": 3,
+      "constrained_nights": 117,
+      "nights": 139
+    },
+    {
+      "hotel": "Resort Hotel",
+      "horizon": 30,
+      "constrained_nights": 41,
+      "nights": 139
+    },
+    {
+      "hotel": "Resort Hotel",
+      "horizon": 14,
+      "constrained_nights": 57,
+      "nights": 139
+    },
+    {
+      "hotel": "Resort Hotel",
+      "horizon": 7,
+      "constrained_nights": 77,
+      "nights": 139
+    },
+    {
+      "hotel": "Resort Hotel",
+      "horizon": 3,
+      "constrained_nights": 101,
+      "nights": 139
+    }
+  ]
+}
